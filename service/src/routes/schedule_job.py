@@ -6,11 +6,9 @@ from dataclasses import dataclass
 import os
 import json
 import uuid
-import time
 from itertools import chain
 
 from fastapi import APIRouter, Form, File, UploadFile, Depends, Request
-from sse_starlette import EventSourceResponse
 
 from google.cloud import batch_v1
 from google.cloud import storage
