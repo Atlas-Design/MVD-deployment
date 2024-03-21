@@ -13,6 +13,10 @@ Or
     pip install git+https://github.com/Atlas-Design/MVD-deployment.git#subdirectory=cli
 ```
 
+After that run for more info:
+```bash
+    sd_cli --help
+```
 
 # Development
 In order to develop the CLI, you need to install the package in development mode. This can be done by running the following command (preferably in some kind of venv):

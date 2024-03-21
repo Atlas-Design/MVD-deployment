@@ -104,7 +104,7 @@ def schedule(
         follow: bool,
         output: Optional[str],
 ):
-    if output is None:
+    if output is not None:
         follow = True
 
     if len(style_images_paths) != len(style_images_weights):
@@ -161,8 +161,8 @@ def schedule(
 
             print(f"Job ID: {job_id}\nStatus: {status}\nProgress: {progress[0]}/{progress[1]}\n")
 
-            if status == "FAILURE":
-                raise click.ClickException("")
+            if status == "FAILED":
+                raise click.ClickException("Job failed")
             elif status == "SUCCEEDED":
                 break
 
@@ -202,6 +202,22 @@ def download(
         job_id: str,
         output: str,
 ):
+    global_config = ctx.find_object(GlobalConfig)
+    assert (global_config is not None)
+
+    check_command = ServiceCheckStatusCommand(
+        base_url=global_config.backend_base,
+        job_id=job_id
+    )
+
+    check_result = check_command.run()
+
+    status = check_result["status"]
+    if status == "FAILED":
+        raise click.ClickException("Cannot download output of failed job")
+    elif status != "SUCCEEDED":
+        raise click.ClickException("Job is still pending, wait until job is completed")
+
     download_result(ctx, job_id, output)
 
 
@@ -234,8 +250,8 @@ def check_status(
 
         print(f"Job ID: {job_id}\nStatus: {status}\nProgress: {progress[0]}/{progress[1]}\n")
 
-        if status == "FAILURE":
-            raise click.ClickException("")
+        if status == "FAILED":
+            raise click.ClickException("Job failed")
         elif status == "SUCCEEDED":
             break
 
