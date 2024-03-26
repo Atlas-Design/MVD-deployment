@@ -26,7 +26,7 @@ class GlobalConfig:
 @click.pass_context
 @click.version_option(__version__)
 # @click.option("-v", "--verbose", type=bool, is_flag=True, default=False, help="Enable verbose mode")
-@click.option("--backend_base", type=str, default="http://34.0.247.142:3000", help="Backend base URL")
+@click.option("--backend_base", type=str, default="http://34.140.119.26:3000", help="Backend base URL")
 def cli(
         ctx: click.Context,
         # verbose: bool,
@@ -152,7 +152,7 @@ def schedule(
         )
 
         while True:
-            time.sleep(10)
+            time.sleep(5)
 
             check_result = check_command.run()
 
