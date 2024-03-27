@@ -241,8 +241,6 @@ def check_status(
     )
 
     while True:
-        time.sleep(10)
-
         check_result = check_command.run()
 
         status = check_result["status"]
@@ -257,3 +255,5 @@ def check_status(
 
         if not follow:
             break
+
+        time.sleep(5)
