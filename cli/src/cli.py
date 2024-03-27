@@ -1,4 +1,6 @@
+import tempfile
 import time
+import zipfile
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -82,8 +84,10 @@ def cli(
                    'Recommended value is around 0.5')
 @click.option("-f", "--follow", is_flag=True, type=bool, default=False,
               help='When set program will wait until job completes.')
-@click.option("-o", "--output", type=click.Path(file_okay=True, dir_okay=False), required=False,
-              help="Path where generated zip archive will be written. Enables --follow flag")
+@click.option("-o", "--output", type=click.Path(file_okay=True, dir_okay=True), required=False,
+              help="Path where output will be downloaded. If ends with .zip, zip archive will be downloaded, "
+                   "otherwise folder with that name will be created, and output will be extracted into it."
+                   "Enables --follow flag")
 def schedule(
         ctx: click.Context,
 
@@ -188,15 +192,27 @@ def download_result(
     )
 
     get_url_result = get_url_command.run()
-    urlretrieve(get_url_result["download_url"], output)
+
+    if output.endswith(".zip"):
+        urlretrieve(get_url_result["download_url"], output)
+    else:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, 'data.zip')
+
+            urlretrieve(get_url_result["download_url"], path)
+
+            with zipfile.ZipFile(path, 'r') as zf:
+                os.makedirs(output, exist_ok=True)
+                zf.extractall(output)
 
 
 @cli.command(short_help="Download output of already finished job")
 @click.pass_context
 @click.option("-j", "--job-id", type=str, required=True,
               help="Job ID whose result to download")
-@click.option("-o", "--output", type=click.Path(file_okay=True, dir_okay=False), required=True,
-              help="Path where generated zip archive will be written.")
+@click.option("-o", "--output", type=click.Path(file_okay=True, dir_okay=True), required=False,
+              help="Path where output will be downloaded. If ends with .zip, zip archive will be downloaded, "
+                   "otherwise folder with that name will be created, and output will be extracted into it.")
 def download(
         ctx: click.Context,
         job_id: str,
