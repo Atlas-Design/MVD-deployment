@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 import abc
 import requests
@@ -13,7 +13,7 @@ class BaseCommand(abc.ABC):
             method: Literal["GET", "POST"],
 
             data: Optional[dict] = None,
-            files: Optional[dict] = None,
+            files: Optional[Union[dict | list]] = None,
             params: Optional[dict] = None,
     ):
         self.base_url = base_url
@@ -43,7 +43,7 @@ class ServiceScheduleJobCommand(BaseCommand):
             self,
             base_url: str,
             data: dict,  # todo: add type hint
-            files: dict,  # todo: add type hint
+            files: Union[dict | list],  # todo: add type hint
     ):
         super().__init__(
             base_url=base_url,

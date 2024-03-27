@@ -130,15 +130,15 @@ def schedule(
             "disable_displacement": disable_displacement,
             "texture_resolution": texture_resolution,
             "generation_size_multiplier": generation_size_multiplier,
-            "style_images_paths": style_images_paths,
             "style_images_weights": style_images_weights,
             "shadeless_strength": shadeless_strength,
             "loras": loras,
             "loras_weights": loras_weights,
         },
-        files={
-            "input_mesh": (os.path.basename(input_mesh), open(input_mesh, "rb")),
-        }
+        files=[
+            *[("style_images", open(sip, "rb")) for sip in style_images_paths],
+            *[("input_mesh", open(input_mesh, "rb"))],
+        ],
     )
 
     schedule_result = schedule_command.run()
