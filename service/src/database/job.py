@@ -1,7 +1,9 @@
 import enum
+import datetime
 
-from .db import  BaseModel
-from peewee import CharField, IntegerField, TextField
+from peewee import CharField, IntegerField, TextField, DateTimeField
+
+from .db import BaseModel
 
 
 class JobStatus(str, enum.Enum):
@@ -16,11 +18,17 @@ class JobStatus(str, enum.Enum):
 class Job(BaseModel):
     id = CharField(primary_key=True, unique=True)
 
+    created_at = DateTimeField(default=datetime.datetime.utcnow)
+
     status = CharField(default=JobStatus.QUEUED)
 
-    batch_job_name = CharField(default=None, null=True)
+    celery_job_ids = TextField(default="[]", null=False)
 
     progress = IntegerField(default=0)
     total = IntegerField()
 
+    current_step = TextField(default=None, null=True)
+
     steps = TextField()
+    payload = TextField()
+

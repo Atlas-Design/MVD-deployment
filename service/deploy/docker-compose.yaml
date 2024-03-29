@@ -1,0 +1,114 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13.0-management
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    deploy:
+      restart_policy:
+        condition: any
+      update_config:
+        order: start-first
+      placement:
+        constraints:
+          - "node.labels.components.rabbitmq==true"
+
+  redis:
+    image: redis:7.2.4
+    restart: always
+    deploy:
+      restart_policy:
+        condition: any
+      update_config:
+        order: start-first
+      placement:
+        constraints:
+          - "node.labels.components.redis==true"
+
+  sd-service-server:
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    command: pipenv run gunicorn 'cmd.server:app' --chdir src -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:3000
+    restart: always
+    environment:
+      ENV: 'main'
+      RABBITMQ_URL: 'amqp://admin:admin@rabbitmq:5672'
+      REDIS_URL: 'redis://redis:6379'
+    volumes:
+      - db-data:/data/
+      - /tmp:/tmp
+    ports:
+      - "3000:3000"
+    deploy:
+      restart_policy:
+        condition: any
+      update_config:
+        order: start-first
+      placement:
+        constraints:
+          - "node.labels.components.service==true"
+
+  sd-service-scheduler:
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    command: pipenv run python src/cmd/scheduler.py
+    restart: always
+    environment:
+      ENV: 'main'
+      RABBITMQ_URL: 'amqp://admin:admin@rabbitmq:5672'
+      REDIS_URL: 'redis://redis:6379'
+    volumes:
+      - db-data:/data/
+    deploy:
+      restart_policy:
+        condition: any
+      update_config:
+        order: start-first
+      placement:
+        constraints:
+          - "node.labels.components.scheduler==true"
+
+
+  sd-cpu-queue:
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    command: pipenv run bash src/cmd/celery_cpu.sh
+    restart: always
+    environment:
+      RABBITMQ_URL: 'amqp://admin:admin@rabbitmq:5672'
+      REDIS_URL: 'redis://redis:6379'
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - /tmp:/tmp
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+      update_config:
+        order: start-first
+      placement:
+        constraints:
+          - "node.labels.components.queues.cpu==true"
+
+  sd-gpu-queue:
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    command: pipenv run bash src/cmd/celery_gpu.sh
+    restart: always
+    environment:
+      RABBITMQ_URL: 'amqp://admin:admin@rabbitmq:5672'
+      REDIS_URL: 'redis://redis:6379'
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - /tmp:/tmp
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+      update_config:
+        order: start-first
+      placement:
+        constraints:
+          - "node.labels.components.queues.gpu==true"
+
+volumes:
+  db-data:

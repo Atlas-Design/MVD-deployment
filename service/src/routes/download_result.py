@@ -25,7 +25,7 @@ def get_download_url(
 
     data_bucket = client_storage.bucket(settings.SD_DATA_STORAGE_BUCKET_NAME)
 
-    output_blob = data_bucket.blob(f"{job_id}/output.zip")
+    output_blob = data_bucket.blob(f"{job_id}/data.zip")
 
     output_blob.make_public()
 

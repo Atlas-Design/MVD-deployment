@@ -9,10 +9,12 @@ uvicorn = {extras = ["standard"], version = "*"}
 pydantic = "*"
 python-multipart = "*"
 pydantic-settings = "*"
-google-cloud-batch = "*"
 google-cloud-storage = "*"
 peewee = "*"
 apscheduler = "*"
+celery = "*"
+docker = "*"
+redis = "*"
 
 [dev-packages]
 

@@ -1,0 +1,28 @@
+{
+  "nodes": {
+    "value": [
+      {
+        "username": "vprotasenia",
+        "public_ip": "35.241.182.224",
+        "swarm_labels": [
+          "components.queues.gpu=true",
+          "components.queues.cpu=true"
+        ],
+        "swarm_node_type": "worker"
+      },
+      {
+        "username": "vprotasenia",
+        "public_ip": "34.140.119.26",
+        "swarm_labels": [
+          "manager.main=true",
+
+          "components.redis=true",
+          "components.rabbitmq=true",
+          "components.service=true",
+          "components.scheduler=true"
+        ],
+        "swarm_node_type": "manager"
+      }
+    ]
+  }
+}

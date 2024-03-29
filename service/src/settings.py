@@ -16,6 +16,9 @@ class Settings(BaseSettings):
 
     SD_DATA_STORAGE_BUCKET_NAME: str = 'sd-experiments'
 
+    RABBITMQ_URL: str = 'amqp://admin:admin@localhost:5672'
+    REDIS_URL: str = 'redis://localhost:6379'
+
     @property
     def DATABASE_URL(self):
         if self.ENV == Environment.DEV:
