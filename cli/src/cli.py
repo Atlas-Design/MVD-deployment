@@ -12,10 +12,10 @@ import click
 from version import __version__
 from service import ServiceScheduleJobCommand, ServiceGetDownloadUrlCommand, ServiceCheckStatusCommand
 
-SUPPORTED_LORAS = {
-    'japanese_shop_v0.1': ('POCJapaneseShop', 'japanese_shop_v0.1.safetensors'),
-    'cyberpunk_v0.1': ('POCCyberpunk', 'cyberpunk_v0.1.safetensors'),
-}
+SUPPORTED_LORAS = [
+    'japanese_shop_v0.1',
+    'cyberpunk_v0.1'
+]
 
 
 @dataclass
@@ -74,7 +74,7 @@ def cli(
               help='Reduces amount of shadows/ambient occlusion in generated images, '
                    'making the generated textures usable as a base color without visible artifacts'
                    ' -- projected shadows')
-@click.option("-l", "--loras", type=click.Choice(choices=list(SUPPORTED_LORAS)), multiple=True, default=[],
+@click.option("-l", "--loras", type=click.Choice(choices=SUPPORTED_LORAS), multiple=True, default=[],
               help='Style-specific LoRA checkpoints to use.'
                    'It is recommended to experiment with style images first.'
                    'This feature can be used independently (with or without style images).')
