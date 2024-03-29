@@ -9,8 +9,8 @@ from urllib.request import urlretrieve
 
 import click
 
-from version import __version__
-from service import ServiceScheduleJobCommand, ServiceGetDownloadUrlCommand, ServiceCheckStatusCommand
+from .version import __version__
+from .service import ServiceScheduleJobCommand, ServiceGetDownloadUrlCommand, ServiceCheckStatusCommand
 
 SUPPORTED_LORAS = [
     'japanese_shop_v0.1',
