@@ -1,8 +1,15 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from starlette import status
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from database import db, Job
+from settings import settings, Environment
 
-app = FastAPI()
+app = FastAPI(
+    **({} if settings.ENV == Environment.DEV else {"docs_url": None, "redoc_url": None})
+)
 
 from routes.schedule_job import router as schedule_job_router
 from routes.download_result import router as download_result_router
@@ -18,3 +25,14 @@ def startup():
     db.connect()
     db.create_tables([Job])
 
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
+
+    print(f"{request}: {exc_str}")
+
+    if settings.ENV == Environment.DEV:
+        return JSONResponse(content={'message': exc_str}, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
+    else:
+        return Response(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
