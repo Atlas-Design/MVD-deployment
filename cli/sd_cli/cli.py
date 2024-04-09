@@ -210,7 +210,7 @@ def download_result(
 @click.pass_context
 @click.option("-j", "--job-id", type=str, required=True,
               help="Job ID whose result to download")
-@click.option("-o", "--output", type=click.Path(file_okay=True, dir_okay=True), required=False,
+@click.option("-o", "--output", type=click.Path(file_okay=True, dir_okay=True), required=True,
               help="Path where output will be downloaded. If ends with .zip, zip archive will be downloaded, "
                    "otherwise folder with that name will be created, and output will be extracted into it.")
 def download(
