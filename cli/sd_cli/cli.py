@@ -49,7 +49,7 @@ def cli(
               help="A negative SD prompt to use")
 @click.option("--prompt_strength", type=float, default=7.5,
               help="Classifier-free guidance scale. It's basically the text prompting weight.")
-@click.option("--random_seed", type=float, default=42, help="Global random seed for the whole pipeline")
+@click.option("--random_seed", type=int, default=42, help="Global random seed for the whole pipeline")
 @click.option("--disable_displacement", is_flag=True, default=False,
               help="Don't generate displacement maps. Faster processing time.")
 @click.option("--texture_resolution", type=int, default=2560,
