@@ -88,6 +88,21 @@ def cli(
               help="Path where output will be downloaded. If ends with .zip, zip archive will be downloaded, "
                    "otherwise folder with that name will be created, and output will be extracted into it."
                    "Enables --follow flag")
+@click.option('--stage_1_steps', type=int, default=26,
+              help="Amount of diffusion steps for generating non-upscaled multi-view image."
+                   "Lower values will usually cause blurry/noisy/distorted/undetailed image."
+                   "The lower the value, the lower the processing time.")
+@click.option('--stage_2_steps', type=int, default=20,
+              help="Amount of diffusion steps for diffusion upscaled multi-view image."
+                   "Only relevant if disable_displacement flag is not set."
+                   "Lower values will usually cause noiser image image (in terms of details)."
+                   "The lower the value, the lower the processing time.")
+@click.option("--disable_3d", is_flag=True, default=False,
+              help="Skip everything related to 3D, generate just the multi-view image "
+                   "and it's depth if it is not disabled")
+@click.option("--disable_upscaling", is_flag=True, default=False,
+              help="Don't run diffusion upscaling. Much faster processing time, "
+                   "blurry textures with likely less detail.")
 def schedule(
         ctx: click.Context,
 
@@ -107,6 +122,11 @@ def schedule(
 
         follow: bool,
         output: Optional[str],
+
+        stage_1_steps: int,
+        stage_2_steps: int,
+        disable_3d: bool,
+        disable_upscaling: bool,
 ):
     if output is not None:
         follow = True
@@ -138,6 +158,10 @@ def schedule(
             "shadeless_strength": shadeless_strength,
             "loras": loras,
             "loras_weights": loras_weights,
+            "stage_1_steps": stage_1_steps,
+            "stage_2_steps": stage_2_steps,
+            "disable_3d": disable_3d,
+            "disable_upscaling": disable_upscaling,
         },
         files=[
             *[("style_images", open(sip, "rb")) for sip in style_images_paths],
