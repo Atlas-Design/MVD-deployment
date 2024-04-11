@@ -37,6 +37,12 @@ class RunConfig:
     loras: List[str] = Form(default=[])
     loras_weights: List[float] = Form(default=[])
 
+    stage_1_steps: int = Form(default=26)
+    stage_2_steps: int = Form(default=20)
+
+    disable_3d: bool = Form(default=False)
+    disable_upscaling: bool = Form(default=False)
+
 
 @router.post("/schedule_job")
 def schedule_job(
@@ -83,6 +89,11 @@ def schedule_job(
             shadeless_strength=config.shadeless_strength,
             loras=config.loras,
             loras_weights=config.loras_weights,
+
+            stage_1_steps=config.stage_1_steps,
+            stage_2_steps=config.stage_2_steps,
+            disable_3d=config.disable_3d,
+            disable_upscaling=config.disable_upscaling,
         ).asdict()),
     )
 

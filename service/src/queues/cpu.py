@@ -68,6 +68,11 @@ class PreStage0Input(AnyStageInput):
     loras: List[str]
     loras_weights: List[float]
 
+    stage_1_steps: int
+    stage_2_steps: int
+    disable_3d: bool
+    disable_upscaling: bool
+
 
 @queue.task(typing=True)
 def prestage_0(raw_input: dict) -> dict:
@@ -108,19 +113,25 @@ def prestage_0(raw_input: dict) -> dict:
         '--input_mesh', '{docker_input_dir}/input_mesh.obj',
         *list(chain.from_iterable(
             [
-                ['--style_images_paths', f'{os.path.join(context["docker_input_dir"], "style_images", path)}'] \
+                ['--style_images_paths', f'{os.path.join(context["docker_input_dir"], "style_images", path)}']
                 for path in input.style_images_paths
             ]
         )),
         *list(chain.from_iterable(
             [
-                ['--style_images_weights', f'{weight}'] \
+                ['--style_images_weights', f'{weight}']
                 for weight in input.style_images_weights
             ]
         )),
         '--shadeless_strength', str(input.shadeless_strength),
         *list(chain.from_iterable([['--loras', f'{lora}'] for lora in input.loras])),
         *list(chain.from_iterable([['--loras_weights', f'{weight}'] for weight in input.loras_weights])),
+
+        '--stage_1_steps', str(input.stage_1_steps),
+        '--stage_2_steps', str(input.stage_2_steps),
+
+        *['--disable_3d' if input.disable_3d else ''],
+        *['--disable_upscaling' if input.disable_upscaling else ''],
     ]
 
     load_data(tmp_dir, input.job_id)
