@@ -43,6 +43,8 @@ def schedule_job(
         request: Request,
         config: RunConfig = Depends(),
 ):
+    config.random_seed = int(config.random_seed)
+
     job_id = str(uuid.uuid4())
 
     with tempfile.TemporaryDirectory() as tmpdir:
