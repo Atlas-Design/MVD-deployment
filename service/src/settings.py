@@ -10,6 +10,11 @@ class Environment(str, enum.Enum):
     DEV = 'dev'
 
 
+class QueueImageTag(str, enum.Enum):
+    STABLE = 'stable'
+    LATEST = 'latest'
+
+
 class Settings(BaseSettings):
     ENV: Environment = Environment.DEV
 
@@ -19,6 +24,8 @@ class Settings(BaseSettings):
 
     RABBITMQ_URL: str = 'amqp://admin:admin@localhost:5672'
     REDIS_URL: str = 'redis://localhost:6379'
+
+    QUEUE_IMAGE_TAG: QueueImageTag = QueueImageTag.STABLE
 
     @property
     def DATABASE_URL(self):

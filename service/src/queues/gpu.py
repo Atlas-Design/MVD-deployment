@@ -23,7 +23,7 @@ def run_docker_command(context: dict, command: str):
     client = docker.from_env()
 
     return client.containers.run(
-        "europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_comfywr",
+        f"europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_comfywr:{settings.QUEUE_IMAGE_TAG.value}",
         command=[
             'bash', '-ex', '-c',
             command.format(**context)

@@ -25,11 +25,12 @@ queue.conf.broker_connection_retry = True
 queue.conf.broker_connection_retry_on_startup = False
 queue.conf.task_track_started = True
 
+
 def run_docker_command(context: dict, command: str):
     client = docker.from_env()
 
     return client.containers.run(
-        "europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_blender:latest",
+        f"europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_blender:{settings.QUEUE_IMAGE_TAG.value}",
         command=[
             'bash', '-ex', '-c',
             command.format(**context)
