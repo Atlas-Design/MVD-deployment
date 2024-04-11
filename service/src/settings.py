@@ -1,4 +1,5 @@
 import enum
+import logging
 import os
 
 from pydantic_settings import BaseSettings
@@ -30,3 +31,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+logging.basicConfig(
+    level=logging.INFO if settings.ENV == Environment.MAIN else logging.DEBUG
+)

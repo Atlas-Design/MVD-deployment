@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette import status
@@ -19,6 +21,8 @@ app.include_router(schedule_job_router)
 app.include_router(download_result_router)
 app.include_router(check_status_router)
 
+logger = logging.getLogger("sd_cloud.server")
+
 
 @app.on_event("startup")
 def startup():
@@ -30,7 +34,7 @@ def startup():
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
 
-    print(f"{request}: {exc_str}")
+    logger.error(f"{request}: {exc_str}")
 
     if settings.ENV == Environment.DEV:
         return JSONResponse(content={'message': exc_str}, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)

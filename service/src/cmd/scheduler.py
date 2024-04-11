@@ -1,6 +1,6 @@
 import json
+import logging
 import datetime
-import traceback
 
 import celery.result
 
@@ -16,6 +16,11 @@ db.connect()
 
 scheduler = BlockingScheduler()
 
+logging.getLogger("apscheduler.scheduler").setLevel(logging.INFO)
+logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
+
+logger = logging.getLogger("sd_cloud.scheduler")
+
 
 def _start_next_step(job: Job):
     steps = json.loads(job.steps)
@@ -24,7 +29,7 @@ def _start_next_step(job: Job):
     job.current_step = step_to_run
     payload = json.loads(job.payload)
 
-    print(step_to_run)
+    logger.debug(f"Running step {step_to_run}")
 
     match step_to_run:
         case 'cpu.prestage_0':
@@ -66,7 +71,7 @@ def check_status_of_running_jobs():
                 job.status = JobStatus.RUNNING
             elif job_state == "FAILURE":
                 job.status = JobStatus.FAILED
-                print(job_result.traceback)
+                logger.error(job_result.traceback)
             elif job_state == "SUCCESS":
                 job_result.forget()
 
@@ -79,8 +84,7 @@ def check_status_of_running_jobs():
                     _start_next_step(job)
 
         except Exception as e:
-            print(e)
-            print(traceback.format_exc())
+            logger.exception(e)
 
             job.status = JobStatus.FAILED
         finally:
@@ -98,8 +102,7 @@ def check_for_new_jobs():
 
             _start_next_step(job)
         except Exception as e:
-            print(e)
-            print(traceback.format_exc())
+            logger.exception(e)
 
             job.status = JobStatus.FAILED
         finally:
@@ -116,13 +119,13 @@ def delete_old_jobs():
         try:
             job.delete()
         except Exception as e:
-            print(e)
-            print(traceback.format_exc())
+            logger.exception(e)
 
 
 scheduler.add_job(check_status_of_running_jobs, 'interval', seconds=2, max_instances=1, coalesce=True)
 scheduler.add_job(check_for_new_jobs, 'interval', seconds=2, max_instances=1, coalesce=True)
-scheduler.add_job(delete_old_jobs, 'interval', hours=2, max_instances=1, coalesce=True, next_run_time=datetime.datetime.utcnow())
+scheduler.add_job(delete_old_jobs, 'interval', hours=2, max_instances=1, coalesce=True,
+                  next_run_time=datetime.datetime.now())
 
 if __name__ == "__main__":
     scheduler.start()
