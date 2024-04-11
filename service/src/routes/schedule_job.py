@@ -65,10 +65,16 @@ def schedule_job(
 
         save_data(tmpdir, job_id)
 
-    steps = [
-        'cpu.prestage_0', 'cpu.stage_0', 'cpu.stage_1',
-        'gpu.stage_2', 'cpu.stage_7', 'cpu.stage_8'
-    ]
+    if config.disable_3d:
+        steps = [
+            'cpu.prestage_0', 'cpu.stage_0', 'cpu.stage_1',
+            'gpu.stage_2'
+        ]
+    else:
+        steps = [
+            'cpu.prestage_0', 'cpu.stage_0', 'cpu.stage_1',
+            'gpu.stage_2', 'cpu.stage_7', 'cpu.stage_8'
+        ]
 
     job: Job = Job.create(
         id=job_id,
