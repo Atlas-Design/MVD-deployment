@@ -18,9 +18,9 @@ class JobStatus(str, enum.Enum):
 class Job(BaseModel):
     id = CharField(primary_key=True, unique=True)
 
-    created_at = DateTimeField(default=datetime.datetime.utcnow)
+    created_at = DateTimeField(default=datetime.datetime.utcnow, index=True)
 
-    status = CharField(default=JobStatus.QUEUED)
+    status = CharField(default=JobStatus.QUEUED, index=True)
 
     celery_job_ids = TextField(default="[]", null=False)
 
