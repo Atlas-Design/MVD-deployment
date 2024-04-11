@@ -106,8 +106,23 @@ def check_for_new_jobs():
             job.save()
 
 
-scheduler.add_job(check_status_of_running_jobs, 'interval', seconds=2)
-scheduler.add_job(check_for_new_jobs, 'interval', seconds=2)
+def delete_old_jobs():
+    jobs = Job.select().where(
+        Job.status != JobStatus.SCHEDULED,
+        Job.created_at < datetime.datetime.utcnow() - datetime.timedelta(days=3),
+    )
+
+    for job in jobs:
+        try:
+            job.delete()
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+
+
+scheduler.add_job(check_status_of_running_jobs, 'interval', seconds=2, max_instances=1, coalesce=True)
+scheduler.add_job(check_for_new_jobs, 'interval', seconds=2, max_instances=1, coalesce=True)
+scheduler.add_job(delete_old_jobs, 'interval', hours=2, max_instances=1, coalesce=True, next_run_time=datetime.datetime.utcnow())
 
 if __name__ == "__main__":
     scheduler.start()
