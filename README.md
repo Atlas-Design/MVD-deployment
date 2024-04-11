@@ -12,9 +12,14 @@ You must configure docker to use gcloud as auth provider:
 gcloud auth configure-docker europe-central2-docker.pkg.dev
 ```
 
-Note: some of the scripts use ssh, GCP VMs create different users for different Google Cloud Accounts.
+## Notes
+
+- some of the scripts use ssh, GCP VMs create different users for different Google Cloud Accounts.
 To use those scripts you many need to add your ssh key to the instance and change username inside the script to yours.
 For most of the scripts it's also possible to override username with `USERNAME` env variable, e.g.: `USERNAME=another-user ./deploy.sh`
+
+- there are two separate queues for `stable` and `latest` stages. Right now their handles are deployed to a separate instances. 
+By default, scripts for building\deploying build\deploy to `latest` stage. To change stage to deploy to change `STAGE` env variable, e.g.: `STAGE=stable ./deploy.sh`
 
 ## Building sd_blender and sd_comfywr images
 To build "local" blender and comfywr images and copy required code for them to run in cloud run: 
@@ -28,7 +33,7 @@ By default, it expects sd_experiments repository to be on the same level as this
 │   ├── sd_experiments
 │   ├── MVD-deployment
 ```
-If sd_experiments repository is placed in a different place use SD_EXPERIMENTS_HOME environment variable to point to it, e.g.:
+If sd_experiments repository is placed in a different place use `SD_EXPERIMENTS_HOME` environment variable to point to it, e.g.:
 ```bash
 SD_EXPERIMENTS_HOME=/path/to/sd_experiments ./images/build.sh
 ```
