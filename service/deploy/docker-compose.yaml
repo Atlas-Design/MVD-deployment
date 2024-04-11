@@ -29,7 +29,7 @@ services:
           - "node.labels.components.redis==true"
 
   sd-service-server:
-    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service:${STAGE}
     command: pipenv run gunicorn 'cmd.server:app' --chdir src -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:3000
     restart: always
     environment:
@@ -40,7 +40,7 @@ services:
       - db-data:/data/
       - /tmp:/tmp
     ports:
-      - "3000:3000"
+      - "${OUTPORT}:3000"
     deploy:
       restart_policy:
         condition: any
@@ -51,7 +51,7 @@ services:
           - "node.labels.components.service==true"
 
   sd-service-scheduler:
-    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service:${STAGE}
     command: pipenv run python src/cmd/scheduler.py
     restart: always
     environment:
@@ -69,14 +69,14 @@ services:
         constraints:
           - "node.labels.components.scheduler==true"
 
-
   sd-cpu-queue:
-    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service:${STAGE}
     command: pipenv run bash src/cmd/celery_cpu.sh
     restart: always
     environment:
       RABBITMQ_URL: 'amqp://admin:admin@rabbitmq:5672'
       REDIS_URL: 'redis://redis:6379'
+      QUEUE_IMAGE_TAG: '${STAGE}'
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - /tmp:/tmp
@@ -88,15 +88,16 @@ services:
         order: start-first
       placement:
         constraints:
-          - "node.labels.components.queues.cpu==true"
+          - "node.labels.components.queues.cpu.${STAGE}==true"
 
   sd-gpu-queue:
-    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service:${STAGE}
     command: pipenv run bash src/cmd/celery_gpu.sh
     restart: always
     environment:
       RABBITMQ_URL: 'amqp://admin:admin@rabbitmq:5672'
       REDIS_URL: 'redis://redis:6379'
+      QUEUE_IMAGE_TAG: '${STAGE}'
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
       - /tmp:/tmp
@@ -108,7 +109,7 @@ services:
         order: start-first
       placement:
         constraints:
-          - "node.labels.components.queues.gpu==true"
+          - "node.labels.components.queues.gpu.${STAGE}==true"
 
 volumes:
   db-data:
