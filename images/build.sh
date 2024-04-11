@@ -4,6 +4,8 @@ set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+export STAGE=${STAGE:=latest}
+
 function build() {
   cd "${SCRIPT_DIR}"
 

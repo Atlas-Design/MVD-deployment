@@ -6,6 +6,10 @@ variable "REPOSITORY" {
     default = "europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments"
 }
 
+variable "STAGE" {
+    default = "latest"
+}
+
 group "default" {
     targets = ["cloud"]
 }
@@ -22,5 +26,5 @@ target "cloud" {
         root = "${SD_EXPERIMENTS_HOME}"
     }
 
-    tags = ["${REPOSITORY}/sd_blender"]
+    tags = ["${REPOSITORY}/sd_blender:${STAGE}"]
 }

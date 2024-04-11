@@ -6,6 +6,10 @@ variable "REPOSITORY" {
     default = "europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments"
 }
 
+variable "STAGE" {
+    default = "latest"
+}
+
 group "default" {
     targets = ["cloud"]
 }
@@ -23,5 +27,5 @@ target "cloud" {
         comfywr-root = "${SD_EXPERIMENTS_HOME}/comfywr"
     }
 
-    tags = ["${REPOSITORY}/sd_comfywr"]
+    tags = ["${REPOSITORY}/sd_comfywr:${STAGE}"]
 }
