@@ -103,6 +103,17 @@ def cli(
 @click.option("--disable_upscaling", is_flag=True, default=False,
               help="Don't run diffusion upscaling. Much faster processing time, "
                    "blurry textures with likely less detail.")
+@click.option("--organic", is_flag=True, default=False,
+              help="This option strongly modify the input mesh by remeshing and smoothing it,"
+                   "then it is treated on a somewhat organic way in the rest of processing steps.")
+@click.option("--apply_displacement_to_mesh", is_flag=True, default=False,
+              help="WARNING: enabling this flat makes the final result very large -- roughly 200-300MB."
+                   "Relevant only when disable_3d and disable_displacement flags are not set."
+                   "Create a very high-poly mesh with applied displacement as a blender modifier,"
+                   "and material with bump mapping using the same displacement map.")
+@click.option("--direct_config_override", "--dco", type=str, default="",
+              help="Advanced feature. List of key=value pairs to override in the underlying generated config."
+                   "Changes are applied at the end, so can also override values implicated by other CLI params")
 def schedule(
         ctx: click.Context,
 
@@ -127,7 +138,14 @@ def schedule(
         stage_2_steps: int,
         disable_3d: bool,
         disable_upscaling: bool,
+
+        organic: bool,
+        apply_displacement_to_mesh: bool,
+        direct_config_override: str,
 ):
+    # print(direct_config_override)
+    # return
+
     if output is not None:
         follow = True
 
@@ -162,6 +180,9 @@ def schedule(
             "stage_2_steps": stage_2_steps,
             "disable_3d": disable_3d,
             "disable_upscaling": disable_upscaling,
+            "organic": organic,
+            "apply_displacement_to_mesh": apply_displacement_to_mesh,
+            "direct_config_override": direct_config_override,
         },
         files=[
             *[("style_images", open(sip, "rb")) for sip in style_images_paths],
