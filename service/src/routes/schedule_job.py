@@ -43,6 +43,10 @@ class RunConfig:
     disable_3d: bool = Form(default=False)
     disable_upscaling: bool = Form(default=False)
 
+    organic: bool = Form(default=False)
+    apply_displacement_to_mesh: bool = Form(default=False)
+    direct_config_override: str = Form(default="")
+
 
 @router.post("/schedule_job")
 def schedule_job(
@@ -100,6 +104,10 @@ def schedule_job(
             stage_2_steps=config.stage_2_steps,
             disable_3d=config.disable_3d,
             disable_upscaling=config.disable_upscaling,
+
+            organic=config.organic,
+            apply_displacement_to_mesh=config.apply_displacement_to_mesh,
+            direct_config_override=config.direct_config_override,
         ).asdict()),
     )
 

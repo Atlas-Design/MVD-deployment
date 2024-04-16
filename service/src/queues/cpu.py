@@ -73,6 +73,10 @@ class PreStage0Input(AnyStageInput):
     disable_3d: bool
     disable_upscaling: bool
 
+    organic: bool
+    apply_displacement_to_mesh: bool
+    direct_config_override: str
+
 
 @queue.task(typing=True)
 def prestage_0(raw_input: dict) -> dict:
@@ -132,6 +136,11 @@ def prestage_0(raw_input: dict) -> dict:
 
         *['--disable_3d' if input.disable_3d else ''],
         *['--disable_upscaling' if input.disable_upscaling else ''],
+
+        *['--organic' if input.organic else ''],
+        *['--apply_displacement_to_mesh' if input.apply_displacement_to_mesh else ''],
+
+        '--direct_config_override', input.direct_config_override,
     ]
 
     load_data(tmp_dir, input.job_id)
