@@ -15,7 +15,7 @@ else
   exit 1
 fi
 
-USERNAME=${USERNAME:-vprotasenia}
+USERNAME=${USERNAME:=vprotasenia}
 MANAGER_HOSTNAME=34.140.119.26
 
 function deploy() {

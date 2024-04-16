@@ -6,7 +6,8 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 #${SCRIPT_DIR}/build.sh
 
-USERNAME=${USERNAME:-vprotasenia}
+USERNAME=${USERNAME:=vprotasenia}
+STAGE=${STAGE:=latest}
 
 if [[ "$STAGE" == "stable" ]]; then
   GPU_QUEUE_HOSTNAMES=("34.77.198.247")
