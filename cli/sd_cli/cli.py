@@ -14,7 +14,13 @@ from .service import ServiceScheduleJobCommand, ServiceGetDownloadUrlCommand, Se
 
 SUPPORTED_LORAS = [
     'japanese_shop_v0.1',
-    'cyberpunk_v0.1'
+    'cyberpunk_v0.1',
+
+    'ext_ghiblism',
+    'ext_cyberpunk',
+    'ext_buildingface',
+    'ext_cyberpunk_fantasy',
+    'ext_isometric',
 ]
 
 
@@ -77,7 +83,8 @@ def cli(
 @click.option("-l", "--loras", type=click.Choice(choices=SUPPORTED_LORAS), multiple=True, default=[],
               help='Style-specific LoRA checkpoints to use.'
                    'It is recommended to experiment with style images first.'
-                   'This feature can be used independently (with or without style images).')
+                   'This feature can be used independently (with or without style images).'
+                   'For LoRAs starting with ext_, the trigger words are not added automatically to prompt !!!')
 @click.option("-lw", "--loras_weights", type=float, multiple=True, default=[],
               help='Weight of influence for each LoRA.'
                    'Should be exactly the same count as the loras parameter.'
@@ -114,6 +121,17 @@ def cli(
 @click.option("--direct_config_override", "--dco", type=str, default="",
               help="Advanced feature. List of key=value pairs to override in the underlying generated config."
                    "Changes are applied at the end, so can also override values implicated by other CLI params")
+@click.option('--stage_2_denoise', type=float, default=0.45,
+              help="How much image can be changed on upscaling stage -- setting too high may cause too much"
+                   " repeatable and distorted geometry to be generated, especially with high"
+                   "generation_size_multiplier values."
+                   "Only relevant when disable_upscaling flag is not set.")
+@click.option('--displacement_quality', type=int, default=2,
+              help="Higher values will produce a little bit less noisy displacement,"
+                   "but slow down the pipeline significantly."
+                   "Only relevant when disable_displacement flag is not set."
+                   "Setting beyond ~12 is not recommended as the results will likely be no better afterwards "
+                   " and processing much slower")
 def schedule(
         ctx: click.Context,
 
@@ -142,10 +160,10 @@ def schedule(
         organic: bool,
         apply_displacement_to_mesh: bool,
         direct_config_override: str,
-):
-    # print(direct_config_override)
-    # return
 
+        stage_2_denoise: float,
+        displacement_quality: int,
+):
     if output is not None:
         follow = True
 
@@ -183,6 +201,8 @@ def schedule(
             "organic": organic,
             "apply_displacement_to_mesh": apply_displacement_to_mesh,
             "direct_config_override": direct_config_override,
+            "stage_2_denoise": stage_2_denoise,
+            "displacement_quality": displacement_quality,
         },
         files=[
             *[("style_images", open(sip, "rb")) for sip in style_images_paths],
