@@ -1,16 +1,16 @@
-import shutil
-import zipfile
 from typing import List
 from dataclasses import dataclass
 
 import os
+import shutil
 from itertools import chain
 
 import docker
+import docker.models.containers
 from celery import Celery
 
 from settings import settings
-from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, load_data, save_data
+from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, load_data, save_data, wait_docker_exit
 
 from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
@@ -26,7 +26,7 @@ queue.conf.broker_connection_retry_on_startup = False
 queue.conf.task_track_started = True
 
 
-def run_docker_command(context: dict, command: str):
+def run_docker_command(context: dict, command: str) -> docker.models.containers.Container:
     client = docker.from_env()
 
     return client.containers.run(
@@ -45,10 +45,12 @@ def run_docker_command(context: dict, command: str):
         environment={
             "OPENCV_IO_ENABLE_OPENEXR": 1
         },
-        stdout=True,
-        stderr=True,
+
+        stdout=False,
+        stderr=False,
 
         remove=True,
+        detach=True,
     )
 
 
@@ -145,21 +147,23 @@ def prestage_0(raw_input: dict) -> dict:
 
     load_data(tmp_dir, input.job_id)
 
-    result = run_docker_command(
-        context,
-        ' '.join([
-            "${{BLENDERPY}}", "/workdir/tools/config_generator.py",
-            *generate_config_args
-        ]) + " > /workdir/job/output/runtime_params_raw"
+    logs = wait_docker_exit(
+        run_docker_command(
+            context,
+            ' '.join([
+                "${{BLENDERPY}}", "/workdir/tools/config_generator.py",
+                *generate_config_args
+            ]) + " > /workdir/job/output/runtime_params_raw"
+        )
     )
-    logger.info(f"{result=}")
+    logger.info(f"{logs=}")
 
     with open(os.path.join(context["local_output_dir"], 'runtime_params_raw'), 'r') as runtime_params_raw_file:
         runtime_params_raw = runtime_params_raw_file.readline().rstrip()
 
         runtime_params_split = runtime_params_raw.split(' ')[1:]
 
-        print(runtime_params_split)
+        logger.info(runtime_params_split)
 
         runtime_params = {
             "random_subset_size": runtime_params_split[0],
@@ -193,14 +197,16 @@ def stage_0(raw_input: dict) -> dict:
 
     context["preprocessed_massings_path"] = os.path.join(context["output_dir"], context["config_filename"], "00_preprocessed_massings")
 
-    result = run_docker_command(
-        context,
-        generate_blender_command(
-            'preprocess_input.py',
-            '-i {massings_paths} -w /workdir/ -o {preprocessed_massings_path} --random_subset_size {random_subset_size}',
+    logs = wait_docker_exit(
+        run_docker_command(
+            context,
+            generate_blender_command(
+                'preprocess_input.py',
+                '-i {massings_paths} -w /workdir/ -o {preprocessed_massings_path} --random_subset_size {random_subset_size}',
+            )
         )
     )
-    logger.info(f"{result=}")
+    logger.info(f"{logs=}")
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
@@ -219,14 +225,16 @@ def stage_1(raw_input: dict) -> dict:
 
     context["prior_renders_path"] = os.path.join(context["output_dir"], context["config_filename"], "01_priors")
 
-    result = run_docker_command(
-        context,
-        generate_blender_command(
-            'render_priors.py',
-            '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path}',
+    logs = wait_docker_exit(
+        run_docker_command(
+            context,
+            generate_blender_command(
+                'render_priors.py',
+                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path}',
+            )
         )
     )
-    print(f"{result=}")
+    logger.info(f"{logs=}")
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
@@ -245,14 +253,16 @@ def stage_7(raw_input: dict) -> dict:
 
     context["displacement_output"] = os.path.join(context["output_dir"], context["config_filename"], "07_displacement")
 
-    result = run_docker_command(
-        context,
-        generate_blender_command(
-            'make_displacement_map.py',
-            '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} /workdir/{generated_textures_path}/ /workdir/{displacement_output}',
+    logs = wait_docker_exit(
+        run_docker_command(
+            context,
+            generate_blender_command(
+                'make_displacement_map.py',
+                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} /workdir/{generated_textures_path}/ /workdir/{displacement_output}',
+            )
         )
     )
-    print(f"{result=}")
+    logger.info(f"{logs=}")
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
@@ -271,14 +281,16 @@ def stage_8(raw_input: dict) -> dict:
 
     context["final_path"] = os.path.join(context["output_dir"], context["config_filename"], "08_final_blend")
 
-    result = run_docker_command(
-        context,
-        generate_blender_command(
-            'apply_textures.py',
-            '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} /workdir/{generated_textures_path} /workdir/{displacement_output}/ /workdir/{final_path}',
+    logs = wait_docker_exit(
+        run_docker_command(
+            context,
+            generate_blender_command(
+                'apply_textures.py',
+                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} /workdir/{generated_textures_path} /workdir/{displacement_output}/ /workdir/{final_path}',
+            )
         )
     )
-    print(f"{result=}")
+    logger.info(f"{logs=}")
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)

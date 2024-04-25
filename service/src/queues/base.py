@@ -1,10 +1,12 @@
-import shutil
-import zipfile
 from dataclasses import dataclass, asdict
 
 import os
 import json
+import shutil
+import zipfile
 
+import requests
+import docker.models.containers
 from google.cloud import storage
 
 from settings import settings
@@ -54,3 +56,14 @@ def load_data(tmp_dir: str, job_id: str) -> None:
 
     with zipfile.ZipFile(os.path.join(tmp_dir, 'data.zip')) as zf:
         zf.extractall(os.path.join(tmp_dir))
+
+
+def wait_docker_exit(container: docker.models.containers.Container) -> str:
+    try:
+        logs = ''
+        for log in container.logs(timestamps=True, stream=True):
+            logs += log.decode()
+        return logs
+    except requests.exceptions.ReadTimeout:
+        container.remove(force=True)
+        raise

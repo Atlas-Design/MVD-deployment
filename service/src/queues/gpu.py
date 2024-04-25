@@ -3,10 +3,15 @@ import shutil
 
 import docker
 import docker.types
+import docker.models.containers
+import requests.exceptions
 from celery import Celery
 
 from settings import settings
-from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, save_data, load_data
+from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, save_data, load_data, wait_docker_exit
+
+from celery.utils.log import get_task_logger
+logger = get_task_logger(__name__)
 
 queue = Celery(
     'gpu',
@@ -19,7 +24,7 @@ queue.conf.broker_connection_retry_on_startup = False
 queue.conf.task_track_started = True
 
 
-def run_docker_command(context: dict, command: str):
+def run_docker_command(context: dict, command: str) -> docker.models.containers.Container:
     client = docker.from_env()
 
     return client.containers.run(
@@ -38,16 +43,18 @@ def run_docker_command(context: dict, command: str):
         environment={
             "OPENCV_IO_ENABLE_OPENEXR": 1
         },
-        stdout=True,
-        stderr=True,
+
+        stdout=False,
+        stderr=False,
+
+        remove=True,
+        detach=True,
 
         device_requests=[
             docker.types.DeviceRequest(
                 capabilities=[['gpu']]
             )
         ],
-
-        remove=True,
     )
 
 
@@ -61,14 +68,17 @@ def stage_2(raw_input: dict) -> dict:
 
     context["generated_textures_path"] = os.path.join(context["output_dir"], context["config_filename"], "02_gen_textures")
 
-    result = run_docker_command(
-        context,
-        'python3 /workdir/sd_scripts/generate_textures.py '
-        '/workdir/{prior_renders_path} '
-        '/workdir/{generated_textures_path} '
-        '--config /workdir/{config_path} ',
+    logs = wait_docker_exit(
+        run_docker_command(
+            context,
+            'python3 /workdir/sd_scripts/generate_textures.py '
+            '/workdir/{prior_renders_path} '
+            '/workdir/{generated_textures_path} '
+            '--config /workdir/{config_path} ',
+        )
     )
-    print(f"{result=}")
+
+    logger.info(f"{logs=}")
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
