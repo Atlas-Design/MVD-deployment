@@ -16,7 +16,7 @@ else
 fi
 
 USERNAME=${USERNAME:=vprotasenia}
-MANAGER_HOSTNAME=34.140.119.26
+MANAGER_HOSTNAME=${MANAGER_HOSTNAME:=34.140.119.26}
 
 function deploy() {
   cd "${SCRIPT_DIR}"
