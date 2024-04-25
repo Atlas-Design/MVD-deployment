@@ -63,6 +63,11 @@ def wait_docker_exit(container: docker.models.containers.Container) -> str:
         logs = ''
         for log in container.logs(timestamps=True, stream=True):
             logs += log.decode()
+
+        # TODO: This is a temporary fix, should handle this in a better way
+        if 'Traceback' in logs:
+            raise Exception(f"Error in logs: {logs}")
+
         return logs
     except requests.exceptions.ReadTimeout:
         container.remove(force=True)
