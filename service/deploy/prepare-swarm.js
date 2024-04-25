@@ -144,16 +144,24 @@ async function setLabels(managerNode, node, nodeId) {
     const sshHost = `${managerNode.username}@${managerNode.public_ip}`;
     const dockerCommand = `docker -H ssh://${sshHost}`;
 
-    // await runCommand(`${dockerCommand} node ls`);
+    const { output } = await runCommand(`${dockerCommand} node inspect ${nodeId}`);
+    const nodeInfo = JSON.parse(output)[0];
+    const currentLabels =
+        Object.entries(nodeInfo['Spec']['Labels']).map(([key, value]) => `${key}=${value}`);
 
-    await runCommand(`${dockerCommand} node update ${node.swarm_labels.map(label => `--label-add ${label}`).join(" ")} ${nodeId}`);
+    const addLabels = node.swarm_labels.filter(label => !currentLabels.includes(label));
+    const removeLabels = currentLabels.filter(label => !node.swarm_labels.includes(label)).map(label => label.split('=')[0]).filter(Boolean);
+
+    if (addLabels.length > 0 || removeLabels.length > 0 ) {
+        await runCommand(`${dockerCommand} node update ${removeLabels.map(label => `--label-rm ${label}`).join(" ")} ${addLabels.map(label => `--label-add ${label}`).join(" ")} ${nodeId}`);
+    }
 }
 
 async function main() {
     /**
      * @type {SwarmConfigType}
      */
-    const swarmConfig = require(path.join(__dirname, "swarm-config.json"));
+    const swarmConfig = require(path.join(__dirname, process.env.CONFIG_PATH ?? "swarm-config.json"));
     console.log(swarmConfig, swarmConfig.nodes.value);
 
     const mainManagerNode = findMainManagerNode(swarmConfig.nodes.value);
