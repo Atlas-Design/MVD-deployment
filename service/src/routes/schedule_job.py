@@ -47,6 +47,9 @@ class RunConfig:
     apply_displacement_to_mesh: bool = Form(default=False)
     direct_config_override: str = Form(default="")
 
+    stage_2_denoise: float = Form(default=0.45)
+    displacement_quality: int = Form(default=2)
+
 
 @router.post("/schedule_job")
 def schedule_job(
@@ -108,6 +111,9 @@ def schedule_job(
             organic=config.organic,
             apply_displacement_to_mesh=config.apply_displacement_to_mesh,
             direct_config_override=config.direct_config_override,
+
+            stage_2_denoise=config.stage_2_denoise,
+            displacement_quality=config.displacement_quality,
         ).asdict()),
     )
 

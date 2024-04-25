@@ -79,6 +79,9 @@ class PreStage0Input(AnyStageInput):
     apply_displacement_to_mesh: bool
     direct_config_override: str
 
+    stage_2_denoise: float
+    displacement_quality: int
+
 
 @queue.task(typing=True)
 def prestage_0(raw_input: dict) -> dict:
@@ -143,6 +146,9 @@ def prestage_0(raw_input: dict) -> dict:
         *['--apply_displacement_to_mesh' if input.apply_displacement_to_mesh else ''],
 
         '--direct_config_override', input.direct_config_override,
+
+        '--stage_2_denoise', str(input.stage_2_denoise),
+        '--displacement_quality', str(input.displacement_quality),
     ]
 
     load_data(tmp_dir, input.job_id)
