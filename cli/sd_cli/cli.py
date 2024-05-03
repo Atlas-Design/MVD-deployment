@@ -4,6 +4,7 @@ import zipfile
 from typing import List, Optional
 from dataclasses import dataclass
 
+import math
 import os.path
 from urllib.request import urlretrieve
 
@@ -60,15 +61,8 @@ def cli(
               help="Don't generate displacement maps. Faster processing time.")
 @click.option("--texture_resolution", type=int, default=2560,
               help="Baked UV texture resolution. Lower value is slightly lower processing time.")
-@click.option("--generation_size_multiplier", type=float, default=1.0,
-              help="Multiplier for the generated texture size. "
-                   "The higher the value the slower the processing time. "
-                   "Keep in mind the texture_resolution value -- "
-                   "too small texture_resolution parameter value will not utilize "
-                   "high generation_size_multiplier properly -- "
-                   "Information will be lost when projecting RGB data to UV space."
-                   "Recommended to keep around 1.0 value.")
-@click.option("-i", "--input_mesh", type=click.Path(exists=True, file_okay=True, dir_okay=False), required=True,
+@click.option("-i", "--input_mesh_path", "--input_mesh", type=click.Path(exists=True, file_okay=True, dir_okay=False),
+              required=True,
               help="A path to the input massing .obj file.")
 @click.option("-s", "--style_images_paths", type=click.Path(exists=True, file_okay=True, dir_okay=False), multiple=True,
               default=[], help="Paths to input style images that will influence the result")
@@ -95,10 +89,11 @@ def cli(
               help="Path where output will be downloaded. If ends with .zip, zip archive will be downloaded, "
                    "otherwise folder with that name will be created, and output will be extracted into it."
                    "Enables --follow flag")
-@click.option('--stage_1_steps', type=int, default=26,
+@click.option('--stage_1_steps', type=int, default=32,
               help="Amount of diffusion steps for generating non-upscaled multi-view image."
                    "Lower values will usually cause blurry/noisy/distorted/undetailed image."
-                   "The lower the value, the lower the processing time.")
+                   "Has relatively marginal effect on processing speed unless almost everything else "
+                   "possible is disabled for performance.")
 @click.option('--stage_2_steps', type=int, default=20,
               help="Amount of diffusion steps for diffusion upscaled multi-view image."
                    "Only relevant if disable_displacement flag is not set."
@@ -124,7 +119,7 @@ def cli(
 @click.option('--stage_2_denoise', type=float, default=0.45,
               help="How much image can be changed on upscaling stage -- setting too high may cause too much"
                    " repeatable and distorted geometry to be generated, especially with high"
-                   "generation_size_multiplier values."
+                   "stage_2_upscale values."
                    "Only relevant when disable_upscaling flag is not set.")
 @click.option('--displacement_quality', type=int, default=2,
               help="Higher values will produce a little bit less noisy displacement,"
@@ -132,49 +127,63 @@ def cli(
                    "Only relevant when disable_displacement flag is not set."
                    "Setting beyond ~12 is not recommended as the results will likely be no better afterwards "
                    " and processing much slower")
+@click.option('--mesh_projection_angle_vertical', type=float, default=math.pi / 2.5,
+              help="Vertical angle from what building should be viewed "
+                   "(camera looking from higher or lower angle). "
+                   "Value 0 means viewing orthogonally from the top, and pi from the bottom.")
+@click.option('--mesh_projection_angle_horizontal', type=float, default=0,
+              help="Angle (rotation around the upwards axis) of the first camera view when doing projection."
+                   "Depending on the input shape different values can work better")
+@click.option('--displacement_rgb_derivation_weight', type=float, default=0,
+              help='A value from range <0, 1> interpolating between estimated displacement'
+                   'and simple adjusted grayscaled RGB image. When > 0, generated displacement will affected '
+                   'by color brightness, displacing e.g. shadows or normally flat patterns.'
+                   'When ==1, it speeds up pipeline because it then disables default displacement processing.')
+@click.option('--enable_4x_upscale', is_flag=True, default=False,
+              help="Upscale RGB and displacement (if applies) UV textures 4x. "
+                   "Relevant only when disable_3d flag is not set. "
+                   "Significantly slows down pipeline.")
+@click.option('--enable_semantics', is_flag=True, default=False,
+              help="Enable semantic segmentation output for buildings."
+                   "Significantly slows down pipeline.")
+@click.option('--displacement_strength', type=float, default=0.03,
+              help="Simply displacement strength on the final mesh "
+                   "(which is normalized so that avg. bounding box dimension size is 1)")
+@click.option('--stage_2_upscale', type=float, default=1.9,
+              help="Multiplier for the generated texture size. "
+                   "Relevant only when disable_upscaling flag is not set. "
+                   "The higher the value the slower the processing time. "
+                   "Keep in mind the texture_resolution value -- "
+                   "too small texture_resolution parameter value will not utilize "
+                   "high stage_2_upscale properly -- "
+                   "Information will be lost when projecting RGB data to UV space."
+                   "Recommended to keep roughly between 1.5-2.5.")
 def schedule(
         ctx: click.Context,
 
-        pos_prompt: str,
-        neg_prompt: str,
-        prompt_strength: float,
-        random_seed: float,
-        disable_displacement: bool,
-        texture_resolution: float,
-        generation_size_multiplier: float,
-        input_mesh: str,
-        style_images_paths: List[str],
-        style_images_weights: List[float],
-        shadeless_strength: float,
-        loras: List[str],
-        loras_weights: List[float],
-
         follow: bool,
-        output: Optional[str],
+        output: str,
 
-        stage_1_steps: int,
-        stage_2_steps: int,
-        disable_3d: bool,
-        disable_upscaling: bool,
+        input_mesh_path: str,
+        style_images_paths: List[str],
 
-        organic: bool,
-        apply_displacement_to_mesh: bool,
-        direct_config_override: str,
-
-        stage_2_denoise: float,
-        displacement_quality: int,
+        **kwargs,
 ):
     if output is not None:
         follow = True
 
-    if len(style_images_paths) != len(style_images_weights):
+    if len(style_images_paths) != len(kwargs['style_images_weights']):
         raise click.UsageError(
             "style images and style images weights arguments should be in the same amount.",
         )
 
-    if len(loras) != len(loras_weights):
+    if len(kwargs['loras']) != len(kwargs['loras_weights']):
         raise click.UsageError(
             "loras and loras_weights arguments should be in the same amount.",
+        )
+    if kwargs['enable_4x_upscale'] and kwargs['disable_3d']:
+        raise click.UsageError(
+            'Both enable_4x_upscale and disable_3d flags cannot be used together.'
         )
 
     global_config = ctx.find_object(GlobalConfig)
@@ -183,30 +192,11 @@ def schedule(
     schedule_command = ServiceScheduleJobCommand(
         base_url=global_config.backend_base,
         data={
-            "pos_prompt": pos_prompt,
-            "neg_prompt": neg_prompt,
-            "prompt_strength": prompt_strength,
-            "random_seed": random_seed,
-            "disable_displacement": disable_displacement,
-            "texture_resolution": texture_resolution,
-            "generation_size_multiplier": generation_size_multiplier,
-            "style_images_weights": style_images_weights,
-            "shadeless_strength": shadeless_strength,
-            "loras": loras,
-            "loras_weights": loras_weights,
-            "stage_1_steps": stage_1_steps,
-            "stage_2_steps": stage_2_steps,
-            "disable_3d": disable_3d,
-            "disable_upscaling": disable_upscaling,
-            "organic": organic,
-            "apply_displacement_to_mesh": apply_displacement_to_mesh,
-            "direct_config_override": direct_config_override,
-            "stage_2_denoise": stage_2_denoise,
-            "displacement_quality": displacement_quality,
+            **kwargs
         },
         files=[
             *[("style_images", open(sip, "rb")) for sip in style_images_paths],
-            *[("input_mesh", open(input_mesh, "rb"))],
+            *[("input_mesh", open(input_mesh_path, "rb"))],
         ],
     )
 
