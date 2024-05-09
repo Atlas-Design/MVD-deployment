@@ -38,14 +38,22 @@ def _start_next_step(job: Job):
             job_result: celery.result.AsyncResult = queues.cpu.stage_0.delay({"job_id": payload["job_id"]})
         case 'cpu.stage_1':
             job_result: celery.result.AsyncResult = queues.cpu.stage_1.delay({"job_id": payload["job_id"]})
+        case 'cpu.stage_3':
+            job_result: celery.result.AsyncResult = queues.cpu.stage_3.delay({"job_id": payload["job_id"]})
+        # case 'cpu.stage_5':
+        #     job_result: celery.result.AsyncResult = queues.cpu.stage_5.delay({"job_id": payload["job_id"]})
         case 'cpu.stage_7':
             job_result: celery.result.AsyncResult = queues.cpu.stage_7.delay({"job_id": payload["job_id"]})
-        case 'cpu.stage_8':
-            job_result: celery.result.AsyncResult = queues.cpu.stage_8.delay({"job_id": payload["job_id"]})
+        case 'cpu.stage_9':
+            job_result: celery.result.AsyncResult = queues.cpu.stage_9.delay({"job_id": payload["job_id"]})
         case 'gpu.stage_2':
             job_result: celery.result.AsyncResult = queues.gpu.stage_2.delay({"job_id": payload["job_id"]})
+        case 'gpu.stage_4':
+            job_result: celery.result.AsyncResult = queues.gpu.stage_4.delay({"job_id": payload["job_id"]})
+        case 'gpu.stage_8':
+            job_result: celery.result.AsyncResult = queues.gpu.stage_8.delay({"job_id": payload["job_id"]})
         case _:
-            raise Exception(f"Unknown step")
+            raise Exception(f"Unknown step: {step_to_run}")
 
     job.celery_job_ids = json.dumps(json.loads(job.celery_job_ids) + [job_result.id])
 

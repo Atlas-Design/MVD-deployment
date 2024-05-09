@@ -5,12 +5,11 @@ import os
 import shutil
 from itertools import chain
 
-import docker
-import docker.models.containers
 from celery import Celery
 
 from settings import settings
-from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, load_data, save_data, wait_docker_exit
+from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, load_data, save_data, wait_docker_exit, \
+    run_blender_docker_command, generate_blender_command
 
 from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
@@ -26,34 +25,6 @@ queue.conf.broker_connection_retry_on_startup = False
 queue.conf.task_track_started = True
 
 
-def run_docker_command(context: dict, command: str) -> docker.models.containers.Container:
-    client = docker.from_env()
-
-    return client.containers.run(
-        f"europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_blender:{settings.QUEUE_IMAGE_TAG.value}",
-        command=[
-            'bash', '-ex', '-c',
-            command.format(**context)
-        ],
-        volumes=[
-            f'{context["local_input_dir"]}:{context["docker_input_dir"]}',
-            f'{context["local_output_dir"]}:{context["docker_output_dir"]}',
-
-            # Needed for style images to be consumed correctly
-            f'{context["local_output_dir"]}:/workdir/blender_workdir/job/output',
-        ],
-        environment={
-            "OPENCV_IO_ENABLE_OPENEXR": 1
-        },
-
-        stdout=False,
-        stderr=False,
-
-        remove=True,
-        detach=True,
-    )
-
-
 @dataclass
 class PreStage0Input(AnyStageInput):
     pos_prompt: str
@@ -62,7 +33,6 @@ class PreStage0Input(AnyStageInput):
     random_seed: float
     disable_displacement: bool
     texture_resolution: int
-    generation_size_multiplier: float
     # input_mesh: str
     style_images_paths: List[str]
     style_images_weights: List[float]
@@ -81,6 +51,16 @@ class PreStage0Input(AnyStageInput):
 
     stage_2_denoise: float
     displacement_quality: int
+
+    mesh_projection_angle_vertical: float
+    mesh_projection_angle_horizontal: float
+
+    stage_2_upscale: float
+    displacement_rgb_derivation_weight: float
+    enable_4x_upscale: bool
+    enable_semantics: bool
+    displacement_strength: float
+
 
 
 @queue.task(typing=True)
@@ -118,7 +98,6 @@ def prestage_0(raw_input: dict) -> dict:
         *['--disable_displacement' if input.disable_displacement else ''],
 
         '--texture_resolution', str(input.texture_resolution),
-        '--generation_size_multiplier', str(input.generation_size_multiplier),
         '--input_mesh', '{docker_input_dir}/input_mesh.obj',
         *list(chain.from_iterable(
             [
@@ -149,12 +128,23 @@ def prestage_0(raw_input: dict) -> dict:
 
         '--stage_2_denoise', str(input.stage_2_denoise),
         '--displacement_quality', str(input.displacement_quality),
+
+        '--stage_2_upscale', str(input.stage_2_upscale),
+
+        '--mesh_projection_angle_vertical', str(input.mesh_projection_angle_vertical),
+        '--mesh_projection_angle_horizontal', str(input.mesh_projection_angle_horizontal),
+
+        '--displacement_strength', str(input.displacement_strength),
+        '--displacement_rgb_derivation_weight', str(input.displacement_rgb_derivation_weight),
+
+        *['--enable_4x_upscale' if input.enable_4x_upscale else ''],
+        *['--enable_semantics' if input.enable_semantics else ''],
     ]
 
     load_data(tmp_dir, input.job_id)
 
     logs = wait_docker_exit(
-        run_docker_command(
+        run_blender_docker_command(
             context,
             ' '.join([
                 "${{BLENDERPY}}", "/workdir/tools/config_generator.py",
@@ -180,15 +170,22 @@ def prestage_0(raw_input: dict) -> dict:
 
         context.update(runtime_params)
 
+    context["preprocessed_massings_path"] = os.path.join(context["output_dir"], context["config_filename"], "00_preprocessed_massings")
+    context["prior_renders_path"] = os.path.join(context["output_dir"], context["config_filename"], "01_priors")
+    context["generated_textures_path"] = os.path.join(context["output_dir"], context["config_filename"], "02_gen_textures")
+    context["semantics_output_dir"] = os.path.join(context["output_dir"], context["config_filename"], "04_semantics")
+    context["projection_output"] = os.path.join(context["output_dir"], context["config_filename"], "03_projection")
+    context["refinement_output_dir"] = os.path.join(context["output_dir"], context["config_filename"], "05_refinement")
+    context["total_grid_output_dir"] = os.path.join(context["output_dir"], context["config_filename"], "06_total_grid")
+    context["displacement_output"] = os.path.join(context["output_dir"], context["config_filename"], "07_displacement")
+    context["upscaled_textures_path"] = os.path.join(context["output_dir"], context["config_filename"], "08_upscale")
+    context["final_path"] = os.path.join(context["output_dir"], context["config_filename"], "09_final_blend")
+
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
     shutil.rmtree(tmp_dir)
 
     return {}
-
-
-def generate_blender_command(command: str, opts: str) -> str:
-    return f'blender --python-exit-code 1 --background --python blender_scripts/{command} -- {opts} --config {{config_path}}'
 
 
 @queue.task(typing=True)
@@ -201,10 +198,8 @@ def stage_0(raw_input: dict) -> dict:
     load_data(tmp_dir, input.job_id)
     context = load_context(tmp_dir)
 
-    context["preprocessed_massings_path"] = os.path.join(context["output_dir"], context["config_filename"], "00_preprocessed_massings")
-
     logs = wait_docker_exit(
-        run_docker_command(
+        run_blender_docker_command(
             context,
             generate_blender_command(
                 'preprocess_input.py',
@@ -229,14 +224,96 @@ def stage_1(raw_input: dict) -> dict:
     load_data(tmp_dir, input.job_id)
     context = load_context(tmp_dir)
 
-    context["prior_renders_path"] = os.path.join(context["output_dir"], context["config_filename"], "01_priors")
 
     logs = wait_docker_exit(
-        run_docker_command(
+        run_blender_docker_command(
             context,
             generate_blender_command(
                 'render_priors.py',
                 '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path}',
+            )
+        )
+    )
+    logger.info(f"{logs=}")
+
+    save_context(tmp_dir, context)
+    save_data(tmp_dir, input.job_id)
+    shutil.rmtree(tmp_dir)
+
+    return {}
+
+
+@queue.task(typing=True)
+def stage_3(raw_input: dict) -> dict:
+    input = AnyStageInput(**raw_input)
+
+    tmp_dir = get_tmp_dir(input.job_id)
+    load_data(tmp_dir, input.job_id)
+    context = load_context(tmp_dir)
+
+
+    logs = wait_docker_exit(
+        run_blender_docker_command(
+            context,
+            generate_blender_command(
+                'make_projected_rgb.py',
+                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} '
+                '/workdir/{generated_textures_path}/ /workdir/{projection_output}',
+            )
+        )
+    )
+    logger.info(f"{logs=}")
+
+    save_context(tmp_dir, context)
+    save_data(tmp_dir, input.job_id)
+    shutil.rmtree(tmp_dir)
+
+    return {}
+
+
+# @queue.task(typing=True)
+# def stage_5(raw_input: dict) -> dict:
+#     input = AnyStageInput(**raw_input)
+#
+#     tmp_dir = get_tmp_dir(input.job_id)
+#     load_data(tmp_dir, input.job_id)
+#     context = load_context(tmp_dir)
+#
+#
+#     logs = wait_docker_exit(
+#         run_blender_docker_command(
+#             context,
+#             generate_blender_command(
+#                 'refine_input_semantics.py',
+#                 '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} '
+#                 '/workdir/{generated_textures_path}/ /workdir/{refinement_output_dir}',
+#             )
+#         )
+#     )
+#     logger.info(f"{logs=}")
+#
+#     save_context(tmp_dir, context)
+#     save_data(tmp_dir, input.job_id)
+#     shutil.rmtree(tmp_dir)
+#
+#     return {}
+
+
+@queue.task(typing=True)
+def stage_6(raw_input: dict) -> dict:
+    input = AnyStageInput(**raw_input)
+
+    tmp_dir = get_tmp_dir(input.job_id)
+    load_data(tmp_dir, input.job_id)
+    context = load_context(tmp_dir)
+
+    logs = wait_docker_exit(
+        run_blender_docker_command(
+            context,
+            generate_blender_command(
+                'make_total_recursive_grid.py',
+                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} '
+                '/workdir/{generated_textures_path}/ /workdir/{total_grid_output_dir}',
             )
         )
     )
@@ -257,14 +334,13 @@ def stage_7(raw_input: dict) -> dict:
     load_data(tmp_dir, input.job_id)
     context = load_context(tmp_dir)
 
-    context["displacement_output"] = os.path.join(context["output_dir"], context["config_filename"], "07_displacement")
-
     logs = wait_docker_exit(
-        run_docker_command(
+        run_blender_docker_command(
             context,
             generate_blender_command(
                 'make_displacement_map.py',
-                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} /workdir/{generated_textures_path}/ /workdir/{displacement_output}',
+                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} '
+                '/workdir/{generated_textures_path}/ /workdir/{displacement_output}',
             )
         )
     )
@@ -278,21 +354,21 @@ def stage_7(raw_input: dict) -> dict:
 
 
 @queue.task(typing=True)
-def stage_8(raw_input: dict) -> dict:
+def stage_9(raw_input: dict) -> dict:
     input = AnyStageInput(**raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
     context = load_context(tmp_dir)
 
-    context["final_path"] = os.path.join(context["output_dir"], context["config_filename"], "08_final_blend")
-
     logs = wait_docker_exit(
-        run_docker_command(
+        run_blender_docker_command(
             context,
             generate_blender_command(
-                'apply_textures.py',
-                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} /workdir/{generated_textures_path} /workdir/{displacement_output}/ /workdir/{final_path}',
+                'make_final_blend.py',
+                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} '
+                '/workdir/{generated_textures_path} /workdir/{projection_output} /workdir/{displacement_output}/ '
+                '/workdir/{upscaled_textures_path} /workdir/{final_path}',
             )
         )
     )

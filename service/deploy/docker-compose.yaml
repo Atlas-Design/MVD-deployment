@@ -111,5 +111,29 @@ services:
         constraints:
           - "node.labels.components.queues.gpu.${STAGE}==true"
 
+  sd-cpu-worker:
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_blender:${STAGE}
+    command: bash -c "exit 0"
+    restart: "no"
+    deploy:
+      mode: global
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - "node.labels.components.queues.cpu.${STAGE}==true"
+
+  sd-gpu-worker:
+    image: europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_comfywr:${STAGE}
+    command: bash -c "exit 0"
+    restart: "no"
+    deploy:
+      mode: global
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - "node.labels.components.queues.gpu.${STAGE}==true"
+
 volumes:
   db-data:

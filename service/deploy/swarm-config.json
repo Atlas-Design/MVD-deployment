@@ -18,6 +18,12 @@
           "components.queues.cpu.latest=true"
         ],
         "swarm_node_type": "worker"
+      },      {
+        "username": "vprotasenia",
+        "public_ip": "34.32.157.76",
+        "swarm_labels": [
+        ],
+        "swarm_node_type": "worker"
       },
       {
         "username": "vprotasenia",
