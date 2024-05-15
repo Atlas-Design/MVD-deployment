@@ -1,6 +1,3 @@
-import os
-import shutil
-
 from celery import Celery
 from celery.utils.log import get_task_logger
 
@@ -23,7 +20,7 @@ queue.conf.task_track_started = True
 
 @queue.task(typing=True)
 def stage_2(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -44,14 +41,14 @@ def stage_2(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
 @queue.task(typing=True)
 def stage_4(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -73,14 +70,14 @@ def stage_4(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
 @queue.task(typing=True)
 def stage_8(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -102,7 +99,35 @@ def stage_8(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
+
+@queue.task(typing=True)
+def poststage_0(raw_input: dict) -> dict:
+    input = AnyStageInput.parse_obj(raw_input)
+
+    tmp_dir = get_tmp_dir(input.job_id)
+    load_data(tmp_dir, input.job_id)
+    context = load_context(tmp_dir)
+
+    logs = wait_docker_exit(
+        run_blender_docker_command(
+            context,
+            generate_blender_command(
+                'make_final_renders.py',
+                '{output_dir} {final_render} -n 1 --samples 32 --render_scale 30',
+                with_config=False,
+            ),
+            with_gpu=True,
+        )
+    )
+
+    logger.info(f"{logs=}")
+
+    save_context(tmp_dir, context)
+    save_data(tmp_dir, input.job_id)
+    # shutil.rmtree(tmp_dir)
+
+    return {}

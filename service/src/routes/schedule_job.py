@@ -1,4 +1,5 @@
 import shutil
+import pathlib
 import tempfile
 from typing import List
 
@@ -30,7 +31,7 @@ class RunConfig:
     random_seed: float = Form()
     disable_displacement: bool = Form()
     texture_resolution: int = Form()
-    input_mesh: UploadFile = File()
+    input_meshes: List[UploadFile] = File()
     style_images: List[UploadFile] = File(default=[])
     style_images_weights: List[float] = Form(default=[])
     shadeless_strength: float = Form()
@@ -50,33 +51,37 @@ class RunConfig:
     stage_2_denoise: float = Form(default=0.45)
     displacement_quality: int = Form(default=2)
 
-    mesh_projection_angle_vertical: float = Form(default=math.pi / 2.5)
-    mesh_projection_angle_horizontal: float = Form(default=0.0)
-
     stage_2_upscale: float = Form(default=1.9)
     displacement_rgb_derivation_weight: float = Form(default=0.0)
     enable_4x_upscale: bool = Form(default=False)
     enable_semantics: bool = Form(default=False)
     displacement_strength: float = Form(default=0.03)
 
+    n_cameras: int = Form(default=4)
+    camera_pitches: List[float] = Form(default=[math.pi / 2.5])
+    camera_yaws: List[float] = Form(default=[0.0])
+
 
 @router.post("/schedule_job")
 def schedule_job(
-        request: Request,
         config: RunConfig = Depends(),
 ):
-    config.random_seed = int(config.random_seed)
-
     job_id = str(uuid.uuid4())
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        os.makedirs(os.path.join(tmpdir, 'job', 'input'), exist_ok=True)
-        with open(os.path.join(tmpdir, 'job', 'input', 'input_mesh.obj'), 'wb') as f:
-            shutil.copyfileobj(config.input_mesh.file, f)
+    input_meshes = [(f'{i:0>3}_{file.filename}', file) for i, file in enumerate(config.input_meshes)]
+    style_images = [(f'{i:0>3}_{file.filename}', file) for i, file in enumerate(config.style_images)]
 
-        os.makedirs(os.path.join(tmpdir, 'job', 'input', 'style_images'), exist_ok=True)
-        for style_file in config.style_images:
-            with open(os.path.join(tmpdir, 'job', 'input', 'style_images', style_file.filename), 'wb') as f:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        job_input_dir = os.path.join(tmpdir, 'job', 'input')
+        os.makedirs(job_input_dir, exist_ok=True)
+        for filename, input_mesh in input_meshes:
+            with open(os.path.join(job_input_dir, filename), 'wb') as f:
+                shutil.copyfileobj(input_mesh.file, f)
+
+        style_images_dir = os.path.join(job_input_dir, 'style_images')
+        os.makedirs(style_images_dir, exist_ok=True)
+        for filename, style_file in style_images:
+            with open(os.path.join(style_images_dir, filename), 'wb') as f:
                 shutil.copyfileobj(style_file.file, f)
 
         save_data(tmpdir, job_id)
@@ -95,6 +100,8 @@ def schedule_job(
             *['cpu.stage_7' if not config.disable_displacement else None],
             *['gpu.stage_8' if config.enable_4x_upscale and not config.disable_3d else None],
             *['cpu.stage_9' if not config.disable_3d else None],
+
+            # 'gpu.poststage_0',
         ]
     ))
 
@@ -111,7 +118,8 @@ def schedule_job(
             random_seed=config.random_seed,
             disable_displacement=config.disable_displacement,
             texture_resolution=config.texture_resolution,
-            style_images_paths=[si.filename for si in config.style_images],
+            input_meshes=[filename for filename, _ in input_meshes],
+            style_images_paths=[filename for filename, _ in style_images],
             style_images_weights=config.style_images_weights,
             shadeless_strength=config.shadeless_strength,
             loras=config.loras,
@@ -129,16 +137,17 @@ def schedule_job(
             stage_2_denoise=config.stage_2_denoise,
             displacement_quality=config.displacement_quality,
 
-            mesh_projection_angle_vertical=config.mesh_projection_angle_vertical,
-            mesh_projection_angle_horizontal=config.mesh_projection_angle_horizontal,
-
             stage_2_upscale=config.stage_2_upscale,
 
             displacement_rgb_derivation_weight=config.displacement_rgb_derivation_weight,
             enable_4x_upscale=config.enable_4x_upscale,
             enable_semantics=config.enable_semantics,
             displacement_strength=config.displacement_strength,
-        ).asdict()),
+
+            n_cameras=config.n_cameras,
+            camera_pitches=config.camera_pitches,
+            camera_yaws=config.camera_yaws,
+        ).model_dump()),
     )
 
     return {"job_id": job.id}

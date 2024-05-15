@@ -9,20 +9,19 @@ import requests
 import docker
 import docker.types
 import docker.models.containers
+
+from pydantic import BaseModel
 from google.cloud import storage
 
 from settings import settings
 
 
-@dataclass
-class AnyStageInput:
+class AnyStageInput(BaseModel):
     job_id: str
-
-    asdict = asdict
 
 
 def get_tmp_dir(job_id: str) -> str:
-    path = os.path.join("/tmp", job_id)
+    path = os.path.join("/tmp", "sd", job_id)
     os.makedirs(path, exist_ok=True)
     return path
 
@@ -49,6 +48,10 @@ def save_data(tmp_dir: str, job_id: str) -> None:
 
 
 def load_data(tmp_dir: str, job_id: str) -> None:
+    # If directory not empty, assume data is already loaded
+    if len(os.listdir(tmp_dir)) > 0:
+        return
+
     client_storage = storage.Client()
 
     data_bucket = client_storage.bucket(settings.SD_DATA_STORAGE_BUCKET_NAME)
@@ -61,12 +64,13 @@ def load_data(tmp_dir: str, job_id: str) -> None:
 
 
 def wait_docker_exit(container: docker.models.containers.Container) -> str:
+    # Note: For some reason, docker container sometimes stuck exiting
+    #   in those cases log streaming exits correctly, so use `logs()` instead of `wait()`
     try:
         logs = ''
         for log in container.logs(timestamps=True, stream=True):
             logs += log.decode()
 
-        # TODO: This is a temporary fix, should handle this in a better way
         if 'Traceback' in logs:
             raise Exception(f"Error in logs: {logs}")
         elif 'ExitCodeError' in logs:
@@ -81,11 +85,14 @@ def wait_docker_exit(container: docker.models.containers.Container) -> str:
 def run_docker_command(image: str, context: dict, command: str, with_gpu: bool) -> docker.models.containers.Container:
     client = docker.from_env()
 
+    # Note: Since we can't use `wait()` to get exit code, we need to use a workaround to detect non-zero exit code
+    #   This is done by using `trap` in the command. Also, because we use -x flag,
+    #   we need to use `\\` to concatenate the `ExitCodeError` string without interpreting it as an error
     return client.containers.run(
-        image,
+        image=image,
         command=[
             'bash', '-ex', '-c',
-            """trap '[ "$?" -ne 0 ] && echo \\Exit\\Code\\Error' ERR""" + "; " + command.format(**context)
+            "trap 'echo \\Exit\\Code\\Error' ERR INT" + "; " + command.format(**context)
         ],
         volumes=[
             f'{context["local_input_dir"]}:{context["docker_input_dir"]}',
@@ -109,6 +116,8 @@ def run_docker_command(image: str, context: dict, command: str, with_gpu: bool) 
                 capabilities=[['gpu']]
             )
         ] if with_gpu else [],
+
+        mem_limit='16g',
     )
 
 
@@ -128,5 +137,5 @@ def run_blender_docker_command(context: dict, command: str, with_gpu: bool = Fal
     )
 
 
-def generate_blender_command(command: str, opts: str) -> str:
-    return f'blender --python-exit-code 1 --background --python blender_scripts/{command} -- {opts} --config {{config_path}}'
+def generate_blender_command(command: str, opts: str, with_config: bool = True) -> str:
+    return f'blender --python-exit-code 1 --background --python blender_scripts/{command} -- {opts} {"--config /workdir/{config_path}" if with_config else ""}'

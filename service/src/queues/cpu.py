@@ -1,3 +1,4 @@
+import time
 from typing import List
 from dataclasses import dataclass
 
@@ -25,15 +26,14 @@ queue.conf.broker_connection_retry_on_startup = False
 queue.conf.task_track_started = True
 
 
-@dataclass
 class PreStage0Input(AnyStageInput):
     pos_prompt: str
     neg_prompt: str
     prompt_strength: float
-    random_seed: float
+    random_seed: int
     disable_displacement: bool
     texture_resolution: int
-    # input_mesh: str
+    input_meshes: List[str]
     style_images_paths: List[str]
     style_images_weights: List[float]
     shadeless_strength: float
@@ -52,22 +52,22 @@ class PreStage0Input(AnyStageInput):
     stage_2_denoise: float
     displacement_quality: int
 
-    mesh_projection_angle_vertical: float
-    mesh_projection_angle_horizontal: float
-
     stage_2_upscale: float
     displacement_rgb_derivation_weight: float
     enable_4x_upscale: bool
     enable_semantics: bool
     displacement_strength: float
 
+    n_cameras: int
+    camera_pitches: list[float]
+    camera_yaws: list[float]
 
 
 @queue.task(typing=True)
 def prestage_0(raw_input: dict) -> dict:
     logger.info("Running prestage_0")
 
-    input = PreStage0Input(**raw_input)
+    input = PreStage0Input.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
 
@@ -87,8 +87,11 @@ def prestage_0(raw_input: dict) -> dict:
     pos_prompt = input.pos_prompt.strip("'")
     neg_prompt = input.neg_prompt.strip("'")
 
+    def multivalue_option(name: str, values: List[str]) -> List[str]:
+        return [name, *values] if len(values) > 0 else []
+
     generate_config_args = [
-        '--workdir', '{docker_output_dir}',
+        '--workdir', "{docker_output_dir}",
 
         '--pos_prompt', f"'{pos_prompt}'",
         '--neg_prompt', f"'{neg_prompt}'",
@@ -98,22 +101,16 @@ def prestage_0(raw_input: dict) -> dict:
         *['--disable_displacement' if input.disable_displacement else ''],
 
         '--texture_resolution', str(input.texture_resolution),
-        '--input_mesh', '{docker_input_dir}/input_mesh.obj',
-        *list(chain.from_iterable(
-            [
-                ['--style_images_paths', f'{os.path.join(context["docker_input_dir"], "style_images", path)}']
-                for path in input.style_images_paths
-            ]
-        )),
-        *list(chain.from_iterable(
-            [
-                ['--style_images_weights', f'{weight}']
-                for weight in input.style_images_weights
-            ]
-        )),
+
+        *multivalue_option('--input_meshes', [os.path.join(context["docker_input_dir"], path) for path in input.input_meshes]),
+
+        *multivalue_option('--style_images_paths', [os.path.join(context["docker_input_dir"], "style_images", path) for path in input.style_images_paths]),
+        *multivalue_option('--style_images_weights', [str(weight) for weight in input.style_images_weights]),
+
         '--shadeless_strength', str(input.shadeless_strength),
-        *list(chain.from_iterable([['--loras', f'{lora}'] for lora in input.loras])),
-        *list(chain.from_iterable([['--loras_weights', f'{weight}'] for weight in input.loras_weights])),
+
+        *multivalue_option('--loras', input.loras),
+        *multivalue_option('--loras_weights', [str(weight) for weight in input.loras_weights]),
 
         '--stage_1_steps', str(input.stage_1_steps),
         '--stage_2_steps', str(input.stage_2_steps),
@@ -131,14 +128,15 @@ def prestage_0(raw_input: dict) -> dict:
 
         '--stage_2_upscale', str(input.stage_2_upscale),
 
-        '--mesh_projection_angle_vertical', str(input.mesh_projection_angle_vertical),
-        '--mesh_projection_angle_horizontal', str(input.mesh_projection_angle_horizontal),
-
         '--displacement_strength', str(input.displacement_strength),
         '--displacement_rgb_derivation_weight', str(input.displacement_rgb_derivation_weight),
 
         *['--enable_4x_upscale' if input.enable_4x_upscale else ''],
         *['--enable_semantics' if input.enable_semantics else ''],
+
+        '--n_cameras', str(input.n_cameras),
+        *multivalue_option('--camera_pitches', [str(value) for value in input.camera_pitches]),
+        *multivalue_option('--camera_yaws', [str(value) for value in input.camera_yaws]),
     ]
 
     load_data(tmp_dir, input.job_id)
@@ -181,6 +179,8 @@ def prestage_0(raw_input: dict) -> dict:
     context["upscaled_textures_path"] = os.path.join(context["output_dir"], context["config_filename"], "08_upscale")
     context["final_path"] = os.path.join(context["output_dir"], context["config_filename"], "09_final_blend")
 
+    context["final_render"] = os.path.join(context["output_dir"], context["config_filename"], "99_final_render")
+
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
     shutil.rmtree(tmp_dir)
@@ -192,7 +192,7 @@ def prestage_0(raw_input: dict) -> dict:
 def stage_0(raw_input: dict) -> dict:
     logger.info("Running stage_0")
 
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -218,7 +218,7 @@ def stage_0(raw_input: dict) -> dict:
 
 @queue.task(typing=True)
 def stage_1(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -245,12 +245,11 @@ def stage_1(raw_input: dict) -> dict:
 
 @queue.task(typing=True)
 def stage_3(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
     context = load_context(tmp_dir)
-
 
     logs = wait_docker_exit(
         run_blender_docker_command(
@@ -266,14 +265,14 @@ def stage_3(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
 # @queue.task(typing=True)
 # def stage_5(raw_input: dict) -> dict:
-#     input = AnyStageInput(**raw_input)
+#     input = AnyStageInput.parse_obj(raw_input)
 #
 #     tmp_dir = get_tmp_dir(input.job_id)
 #     load_data(tmp_dir, input.job_id)
@@ -301,7 +300,7 @@ def stage_3(raw_input: dict) -> dict:
 
 @queue.task(typing=True)
 def stage_6(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -321,14 +320,14 @@ def stage_6(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
 @queue.task(typing=True)
 def stage_7(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -348,14 +347,14 @@ def stage_7(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
 @queue.task(typing=True)
 def stage_9(raw_input: dict) -> dict:
-    input = AnyStageInput(**raw_input)
+    input = AnyStageInput.parse_obj(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -376,6 +375,6 @@ def stage_9(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
