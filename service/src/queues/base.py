@@ -117,7 +117,7 @@ def run_docker_command(image: str, context: dict, command: str, with_gpu: bool) 
             )
         ] if with_gpu else [],
 
-        mem_limit='16g',
+        mem_limit='48g',
     )
 
 
