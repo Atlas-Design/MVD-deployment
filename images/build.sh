@@ -15,6 +15,7 @@ function build() {
   docker buildx create --name=container --driver=docker-container --bootstrap
 
   docker buildx bake -f blender.docker-bake.hcl --progress plain --push --builder=container
+  echo "----------------------------------------------------------------------------------"
   docker buildx bake -f comfywr.docker-bake.hcl --progress plain --push --builder=container
 }
 
