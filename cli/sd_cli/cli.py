@@ -16,6 +16,7 @@ from .service import ServiceScheduleJobCommand, ServiceGetDownloadUrlCommand, Se
 SUPPORTED_LORAS = [
     'japanese_shop_v0.1',
     'cyberpunk_v0.1',
+    'prahov_v0.1',
 
     'ext_ghiblism',
     'ext_cyberpunk',
@@ -61,8 +62,8 @@ def cli(
               help="Don't generate displacement maps. Faster processing time.")
 @click.option("--texture_resolution", type=int, default=2560,
               help="Baked UV texture resolution. Lower value is slightly lower processing time.")
-@click.option("-i", "--input_mesh_path", "--input_mesh", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              required=True,
+@click.option("-i", "--input_meshes_path", "--input_meshes", type=click.Path(exists=True, file_okay=True, dir_okay=False),
+              required=True, multiple=True,
               help="A path to the input massing .obj file.")
 @click.option("-s", "--style_images_paths", type=click.Path(exists=True, file_okay=True, dir_okay=False), multiple=True,
               default=[], help="Paths to input style images that will influence the result")
@@ -127,13 +128,6 @@ def cli(
                    "Only relevant when disable_displacement flag is not set."
                    "Setting beyond ~12 is not recommended as the results will likely be no better afterwards "
                    " and processing much slower")
-@click.option('--mesh_projection_angle_vertical', type=float, default=math.pi / 2.5,
-              help="Vertical angle from what building should be viewed "
-                   "(camera looking from higher or lower angle). "
-                   "Value 0 means viewing orthogonally from the top, and pi from the bottom.")
-@click.option('--mesh_projection_angle_horizontal', type=float, default=0,
-              help="Angle (rotation around the upwards axis) of the first camera view when doing projection."
-                   "Depending on the input shape different values can work better")
 @click.option('--displacement_rgb_derivation_weight', type=float, default=0,
               help='A value from range <0, 1> interpolating between estimated displacement'
                    'and simple adjusted grayscaled RGB image. When > 0, generated displacement will affected '
@@ -158,13 +152,25 @@ def cli(
                    "high stage_2_upscale properly -- "
                    "Information will be lost when projecting RGB data to UV space."
                    "Recommended to keep roughly between 1.5-2.5.")
+@click.option('--n_cameras', type=int, default=4, help='Amount of projection views.')
+@click.option('--camera_pitches', type=float, multiple=True, default=[math.pi / 2.5],
+              help="Vertical angles from what building should be viewed "
+                   "(camera looking from higher or lower angle). "
+                   "Value 0 means viewing orthogonally from the top, and pi from the bottom. "
+                   "There can be a single value or as many as value of --n_cameras argument."
+                   "If a single value is provided other will be generated to provide a turntable object view")
+@click.option('--camera_yaws', type=float, multiple=True, default=[0],
+              help="Angle (rotation around the upwards axis) of the first camera view when doing projection."
+                   "Depending on the input shape different values can work better"
+                   "There can be a single value or as many as value of --n_cameras argument."
+                   "If a single value is provided, it is repeated --n_cameras times.")
 def schedule(
         ctx: click.Context,
 
         follow: bool,
         output: str,
 
-        input_mesh_path: str,
+        input_meshes_path: str,
         style_images_paths: List[str],
 
         **kwargs,
@@ -186,17 +192,20 @@ def schedule(
             'Both enable_4x_upscale and disable_3d flags cannot be used together.'
         )
 
+    if len(kwargs['camera_yaws']) not in (1, kwargs['n_cameras']):
+        raise click.UsageError('Camera yaws amount needs to be either 1 or --n_cameras')
+    if len(kwargs['camera_pitches']) not in (1, kwargs['n_cameras']):
+        raise click.UsageError('Camera pitches amount needs to be either 1 or --n_cameras')
+
     global_config = ctx.find_object(GlobalConfig)
     assert (global_config is not None)
 
     schedule_command = ServiceScheduleJobCommand(
         base_url=global_config.backend_base,
-        data={
-            **kwargs
-        },
+        data={**kwargs},
         files=[
             *[("style_images", open(sip, "rb")) for sip in style_images_paths],
-            *[("input_mesh", open(input_mesh_path, "rb"))],
+            *[("input_meshes", open(imp, "rb")) for imp in input_meshes_path],
         ],
     )
 
