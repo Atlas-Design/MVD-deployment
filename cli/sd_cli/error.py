@@ -1,0 +1,3 @@
+
+class UsageError(Exception):
+    pass

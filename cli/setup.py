@@ -5,7 +5,6 @@ setup(
     name='sd_cli',
     version=__version__,
     install_requires=[
-        'click>=8.1.7',
         'requests>=2.31.0'
     ],
     packages=find_packages(include=["sd_cli"]),
