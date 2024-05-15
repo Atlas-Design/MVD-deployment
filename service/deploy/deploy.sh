@@ -15,7 +15,7 @@ else
   exit 1
 fi
 
-USERNAME=${USERNAME:=vprotasenia}
+MANAGER_USERNAME=${MANAGER_USERNAME:=vprotasenia}
 MANAGER_HOSTNAME=${MANAGER_HOSTNAME:=34.140.119.26}
 
 function deploy() {
@@ -24,7 +24,7 @@ function deploy() {
   docker build .. -t europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service:${STAGE}
   docker push europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/service:${STAGE}
 
-  docker -H ssh://${USERNAME}@${MANAGER_HOSTNAME} stack deploy -c docker-compose.yaml --detach=true --resolve-image always --with-registry-auth --prune "sd-experiments-${STAGE}"
+  docker -H ssh://${MANAGER_USERNAME}@${MANAGER_HOSTNAME} stack deploy -c docker-compose.yaml --detach=true --resolve-image always --with-registry-auth --prune "sd-experiments-${STAGE}"
 }
 
 deploy
