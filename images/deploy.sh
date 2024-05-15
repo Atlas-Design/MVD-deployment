@@ -4,7 +4,9 @@ set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-#${SCRIPT_DIR}/build.sh
+if [[ "$1" == "--build" ]]; then
+  ${SCRIPT_DIR}/build.sh
+fi
 
 USERNAME=${USERNAME:=vprotasenia}
 STAGE=${STAGE:=latest}
