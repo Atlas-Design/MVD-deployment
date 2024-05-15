@@ -1,5 +1,5 @@
 variable "SD_EXPERIMENTS_HOME" {
-    default = "SD_EXPERIMENTS_HOME"
+    default = "$SD_EXPERIMENTS_HOME"
 }
 
 variable "REPOSITORY" {
@@ -28,4 +28,7 @@ target "cloud" {
     }
 
     tags = ["${REPOSITORY}/sd_comfywr:${STAGE}"]
+
+    cache-to = ["type=registry,ref=${REPOSITORY}/sd_comfywr_cache:${STAGE},mode=max"]
+    cache-from = ["type=registry,ref=${REPOSITORY}/sd_comfywr_cache:${STAGE}", "type=registry,ref=${REPOSITORY}/sd_comfywr_cache:latest"]
 }

@@ -11,8 +11,11 @@ function build() {
 
   export SD_EXPERIMENTS_HOME=${SD_EXPERIMENTS_HOME:=../../sd_experiments}
 
-  docker buildx bake -f blender.docker-bake.hcl --push
-  docker buildx bake -f comfywr.docker-bake.hcl --push
+  trap "docker buildx rm container" EXIT INT
+  docker buildx create --name=container --driver=docker-container --bootstrap
+
+  docker buildx bake -f blender.docker-bake.hcl --progress plain --push --builder=container
+  docker buildx bake -f comfywr.docker-bake.hcl --progress plain --push --builder=container
 }
 
 build

@@ -1,5 +1,6 @@
 FROM local
 
+# TODO: use bind mount to copy files instead?
 COPY --from=root sd_models /workdir/ComfyUI/models
 COPY --from=root sd_scripts /workdir/sd_scripts
 

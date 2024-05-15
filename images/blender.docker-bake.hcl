@@ -27,4 +27,7 @@ target "cloud" {
     }
 
     tags = ["${REPOSITORY}/sd_blender:${STAGE}"]
+
+    cache-to = ["type=registry,ref=${REPOSITORY}/sd_blender_cache:${STAGE},mode=max"]
+    cache-from = ["type=registry,ref=${REPOSITORY}/sd_blender_cache:${STAGE}", "type=registry,ref=${REPOSITORY}/sd_blender_cache:latest"]
 }
