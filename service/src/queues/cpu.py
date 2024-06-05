@@ -40,19 +40,17 @@ class PreStage0Input(AnyStageInput):
     loras: List[str]
     loras_weights: List[float]
 
-    stage_1_steps: int
-    stage_2_steps: int
+    stages_steps: List[int]
+
     disable_3d: bool
-    disable_upscaling: bool
 
-    organic: bool
     apply_displacement_to_mesh: bool
-    direct_config_override: str
+    direct_config_override: List[str]
 
-    stage_2_denoise: float
+    stages_denoise: List[float]
     displacement_quality: int
 
-    stage_2_upscale: float
+    stages_upscale: List[float]
     displacement_rgb_derivation_weight: float
     enable_4x_upscale: bool
     enable_semantics: bool
@@ -61,6 +59,9 @@ class PreStage0Input(AnyStageInput):
     n_cameras: int
     camera_pitches: list[float]
     camera_yaws: list[float]
+
+    total_remesh_mode: str
+    stages_enable: List[int]
 
 
 @queue.task(typing=True)
@@ -112,21 +113,20 @@ def prestage_0(raw_input: dict) -> dict:
         *multivalue_option('--loras', input.loras),
         *multivalue_option('--loras_weights', [str(weight) for weight in input.loras_weights]),
 
-        '--stage_1_steps', str(input.stage_1_steps),
-        '--stage_2_steps', str(input.stage_2_steps),
+        *multivalue_option('--stages_steps', [str(value) for value in input.stages_steps]),
 
         *['--disable_3d' if input.disable_3d else ''],
-        *['--disable_upscaling' if input.disable_upscaling else ''],
+        *multivalue_option('--stages_enable', [str(value) for value in input.stages_enable]),
 
-        *['--organic' if input.organic else ''],
         *['--apply_displacement_to_mesh' if input.apply_displacement_to_mesh else ''],
 
-        '--direct_config_override', input.direct_config_override,
+        *multivalue_option('--direct_config_override', input.direct_config_override),
 
-        '--stage_2_denoise', str(input.stage_2_denoise),
+        *multivalue_option('--stages_denoise', [str(value) for value in input.stages_denoise]),
+
         '--displacement_quality', str(input.displacement_quality),
 
-        '--stage_2_upscale', str(input.stage_2_upscale),
+        *multivalue_option('--stages_upscale', [str(value) for value in input.stages_upscale]),
 
         '--displacement_strength', str(input.displacement_strength),
         '--displacement_rgb_derivation_weight', str(input.displacement_rgb_derivation_weight),
@@ -137,6 +137,8 @@ def prestage_0(raw_input: dict) -> dict:
         '--n_cameras', str(input.n_cameras),
         *multivalue_option('--camera_pitches', [str(value) for value in input.camera_pitches]),
         *multivalue_option('--camera_yaws', [str(value) for value in input.camera_yaws]),
+
+        '--total_remesh_mode', input.total_remesh_mode,
     ]
 
     load_data(tmp_dir, input.job_id)

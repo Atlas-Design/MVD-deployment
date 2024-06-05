@@ -38,20 +38,17 @@ class RunConfig:
     loras: List[str] = Form(default=[])
     loras_weights: List[float] = Form(default=[])
 
-    stage_1_steps: int = Form(default=32)
-    stage_2_steps: int = Form(default=20)
+    stages_steps: List[int] = Form(default=[24, 24, 24], min_length=3, max_length=3)
 
     disable_3d: bool = Form(default=False)
-    disable_upscaling: bool = Form(default=False)
 
-    organic: bool = Form(default=False)
     apply_displacement_to_mesh: bool = Form(default=False)
-    direct_config_override: str = Form(default="")
+    direct_config_override: List[str] = Form(default=[])
 
-    stage_2_denoise: float = Form(default=0.45)
+    stages_denoise: List[float] = Form(default=[0.45, 0.2])
     displacement_quality: int = Form(default=2)
 
-    stage_2_upscale: float = Form(default=1.9)
+    stages_upscale: List[float] = Form(default=[1.9, 2], min_length=2, max_length=2)
     displacement_rgb_derivation_weight: float = Form(default=0.0)
     enable_4x_upscale: bool = Form(default=False)
     enable_semantics: bool = Form(default=False)
@@ -60,6 +57,9 @@ class RunConfig:
     n_cameras: int = Form(default=4)
     camera_pitches: List[float] = Form(default=[math.pi / 2.5])
     camera_yaws: List[float] = Form(default=[0.0])
+
+    total_remesh_mode: str = Form(default="none")
+    stages_enable: List[int] = Form(default=[1, 0], min_length=2, max_length=2)
 
 
 @router.post("/schedule_job")
@@ -125,19 +125,16 @@ def schedule_job(
             loras=config.loras,
             loras_weights=config.loras_weights,
 
-            stage_1_steps=config.stage_1_steps,
-            stage_2_steps=config.stage_2_steps,
+            stages_steps=config.stages_steps,
             disable_3d=config.disable_3d,
-            disable_upscaling=config.disable_upscaling,
 
-            organic=config.organic,
             apply_displacement_to_mesh=config.apply_displacement_to_mesh,
             direct_config_override=config.direct_config_override,
 
-            stage_2_denoise=config.stage_2_denoise,
+            stages_denoise=config.stages_denoise,
             displacement_quality=config.displacement_quality,
 
-            stage_2_upscale=config.stage_2_upscale,
+            stages_upscale=config.stages_upscale,
 
             displacement_rgb_derivation_weight=config.displacement_rgb_derivation_weight,
             enable_4x_upscale=config.enable_4x_upscale,
@@ -147,6 +144,9 @@ def schedule_job(
             n_cameras=config.n_cameras,
             camera_pitches=config.camera_pitches,
             camera_yaws=config.camera_yaws,
+
+            total_remesh_mode=config.total_remesh_mode,
+            stages_enable=config.stages_enable,
         ).model_dump()),
     )
 
