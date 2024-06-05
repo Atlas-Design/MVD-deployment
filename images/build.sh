@@ -9,14 +9,16 @@ export STAGE=${STAGE:=latest}
 function build() {
   cd "${SCRIPT_DIR}"
 
-  export SD_EXPERIMENTS_HOME=${SD_EXPERIMENTS_HOME:=../../sd_experiments}
+  export SD_EXPERIMENTS_HOME=${SD_EXPERIMENTS_HOME:=$SCRIPT_DIR/../../sd_experiments}
 
   trap "docker buildx rm container" EXIT INT
   docker buildx create --name=container --driver=docker-container --bootstrap
 
+  echo "----------------------------------------------------------------------------------"
   docker buildx bake -f blender.docker-bake.hcl --progress plain --push --builder=container
   echo "----------------------------------------------------------------------------------"
-  docker buildx bake -f comfywr.docker-bake.hcl --progress plain --push --builder=container
+#  docker buildx bake -f comfywr.docker-bake.hcl --progress plain --push --builder=container
+  echo "----------------------------------------------------------------------------------"
 }
 
 build

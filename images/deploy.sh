@@ -15,8 +15,8 @@ if [[ "$STAGE" == "stable" ]]; then
   GPU_QUEUE_HOSTNAMES=("34.77.198.247")
   CPU_QUEUE_HOSTNAMES=("34.77.198.247")
 elif [[ "$STAGE" == "latest" ]]; then
-  GPU_QUEUE_HOSTNAMES=("34.79.137.55")
-  CPU_QUEUE_HOSTNAMES=("34.79.137.55")
+  GPU_QUEUE_HOSTNAMES=("35.204.188.101")
+  CPU_QUEUE_HOSTNAMES=("35.204.188.101")
 else
   echo "STAGE can only be 'stable' or 'latest'"
   exit 1
