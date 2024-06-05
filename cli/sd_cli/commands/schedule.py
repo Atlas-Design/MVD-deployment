@@ -10,7 +10,7 @@ from sd_cli.error import UsageError
 from sd_cli.utils.download_result import download_result
 from sd_cli.api.service import ServiceScheduleJobCommand, ServiceCheckStatusCommand
 
-SUPPORTED_LORAS = [
+SUPPORTED_LORAS = {
     'japanese_shop_v0.1',
     'cyberpunk_v0.1',
     'prahov_v0.1',
@@ -20,7 +20,10 @@ SUPPORTED_LORAS = [
     'ext_buildingface',
     'ext_cyberpunk_fantasy',
     'ext_isometric',
-]
+    'ext_desert',
+
+    'ext_add_detail',
+}
 
 
 def add_subparser(subparsers):
@@ -73,30 +76,25 @@ def add_subparser(subparsers):
                              "When running with disable_upscaling flag, "
                              "it is safe to keep at lower value without much detail loss -- e.g. 1280."
                              "High values especially slows down pipeline when enable_semantics flag is set")
-    parser.add_argument('--stage_2_upscale', type=float, default=1.9,
-                        help="Multiplier for the generated texture size. "
-                             "Relevant only when disable_upscaling flag is not set. "
-                             "The higher the value the slower the processing time. "
+    parser.add_argument('--stages_upscale', type=float, nargs=2, default=(1.9, 2),
+                        help="Multiplier for the generated image size (for stages 2 and 3). "
+                             "Relevant only when relevant stages_enable flag are set. "
+                             "The higher the values the slower the processing time. "
                              "Keep in mind the texture_resolution value -- "
                              "too small texture_resolution parameter value will not utilize "
-                             "high stage_2_upscale properly -- "
-                             "Information will be lost when projecting RGB data to UV space."
-                             "Recommended to keep roughly between 1.5-2.5.")
-    parser.add_argument('--stage_1_steps', type=int, default=32,
+                             "high upscaling factors values properly. "
+                             "Therefore, high-res information can be lost "
+                             "when projecting RGB data to UV space in such case. ")
+    parser.add_argument('--stages_steps', type=int, nargs=3, default=(24, 24, 24),
                         help="Amount of diffusion steps for generating non-upscaled multi-view image."
                              "Lower values will usually cause blurry/noisy/distorted/undetailed image."
                              "Has relatively marginal effect on processing speed unless almost everything else "
                              "possible is disabled for performance.")
-    parser.add_argument('--stage_2_steps', type=int, default=20,
-                        help="Amount of diffusion steps for diffusion upscaled multi-view image."
-                             "Only relevant if disable_displacement flag is not set."
-                             "Lower values will usually cause noiser image image (in terms of details)."
-                             "The lower the value, the lower the processing time.")
-    parser.add_argument('--stage_2_denoise', type=float, default=0.45,
-                        help="How much image can be changed on upscaling stage -- setting too high may cause too much"
-                             " repeatable and distorted geometry to be generated, especially with high"
-                             "stage_2_upscale values."
-                             "Only relevant when disable_upscaling flag is not set.")
+    parser.add_argument('--stages_denoise', type=float, nargs=2, default=(0.45, 0.2),
+                        help="How much image can be changed on upscaling stages (2 and 3)."
+                             "Setting too high may cause too much "
+                             " repeatable and distorted geometry to be generated. "
+                             "Only relevant when relevant stages_enable flags are set.")
     parser.add_argument('--displacement_quality', type=int, default=2,
                         help="Higher values will produce a little bit less noisy displacement,"
                              "but slow down the pipeline significantly."
@@ -126,9 +124,11 @@ def add_subparser(subparsers):
                              "There can be a single value or as many as value of --n_cameras argument."
                              "If a single value is provided, it is repeated --n_cameras times.")
 
-    parser.add_argument('--organic', action='store_true', default=False,
-                        help="This option strongly modify the input mesh by remeshing and smoothing it,"
-                             "then it is treated on a somewhat organic way in the rest of processing steps.")
+    parser.add_argument('--total_remesh_mode', type=str, default='none',
+                        help='One of "none", "smooth_organic", "none_organic", "hard_surface", "smoothed_hard_surface".'
+                             'It runs complex input mesh preprocessing if !="none".'
+                             'See CLI examples for understanding how options work'
+                             ' -- functionality hard to describe in text.')
     parser.add_argument('--apply_displacement_to_mesh', action='store_true', default=False,
                         help="WARNING: enabling this flat makes the final result very large -- roughly 200-300MB."
                              "Relevant only when disable_3d and disable_displacement flags are not set."
@@ -138,9 +138,8 @@ def add_subparser(subparsers):
     parser.add_argument('--disable_3d', action='store_true', default=False,
                         help="Skip everything related to 3D, generate just the multi-view image "
                              "and it's depth if it is not disabled")
-    parser.add_argument('--disable_upscaling', action='store_true', default=False,
-                        help="Don't run diffusion upscaling. Much faster processing time, "
-                             "blurry textures with likely less detail.")
+    parser.add_argument('--stages_enable', type=int, nargs=2, default=(1, 0),
+                        help="Sets whether the diffusion stage_2 and stage_3 (ultimate) are enabled/disabled.")
     parser.add_argument('--disable_displacement', action='store_true', default=False,
                         help="Don't generate displacement maps. Faster processing time."
                              "In case of running disable_3d, it skips generating depth maps.")
@@ -158,6 +157,8 @@ def add_subparser(subparsers):
                         help='Paths to input style images that will influence the result')
     parser.add_argument('-sw', '--style_images_weights', type=float, nargs="*", default=[],
                         help='Weight of influence for each style images.'
+                             'It is possible to pass the amount equall to the amount of given style_images_paths,'
+                             'or 3x more -- in the second case the weights will be specified for each pipeline stage.'
                              'Should be exactly the same count as the style_images_paths parameter.'
                              'Recommended value is around 0.3.')
 
@@ -196,8 +197,8 @@ def schedule(
 
         **kwargs,
 ):
-    if len(style_images_paths) != len(kwargs['style_images_weights']):
-        raise UsageError("style images and style images weights arguments should be in the same amount.")
+    if len(kwargs['style_images_weights']) not in (len(style_images_paths), len(style_images_paths) * 3):
+        raise UsageError('style images and style images weights arguments should be in the same amount or 3x.')
     if len(kwargs['loras']) != len(kwargs['loras_weights']):
         raise UsageError("loras and loras_weights arguments should be in the same amount.")
     for lora in kwargs['loras']:
@@ -209,6 +210,10 @@ def schedule(
         raise UsageError('Camera yaws amount needs to be either 1 or --n_cameras')
     if len(kwargs['camera_pitches']) not in (1, kwargs['n_cameras']):
         raise UsageError('Camera pitches amount needs to be either 1 or --n_cameras')
+
+    total_remesh_mode_options = {'none', 'smooth_organic', 'none_organic', 'hard_surface', 'smoothed_hard_surface'}
+    if kwargs['total_remesh_mode'] not in total_remesh_mode_options:
+        raise UsageError(f'{kwargs["total_remesh_mode"]=} not in {total_remesh_mode_options}')
 
     if output is not None:
         follow = True
