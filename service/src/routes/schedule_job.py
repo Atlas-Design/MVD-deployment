@@ -30,7 +30,7 @@ class RunConfig:
     prompt_strength: float = Form()
     random_seed: float = Form()
     disable_displacement: bool = Form()
-    texture_resolution: int = Form()
+    texture_processing_resolution: List[int] = Form(default=[2560, 2560], min_length=2, max_length=2)
     input_meshes: List[UploadFile] = File()
     style_images: List[UploadFile] = File(default=[])
     style_images_weights: List[float] = Form(default=[])
@@ -50,7 +50,7 @@ class RunConfig:
 
     stages_upscale: List[float] = Form(default=[1.9, 2], min_length=2, max_length=2)
     displacement_rgb_derivation_weight: float = Form(default=0.0)
-    enable_4x_upscale: bool = Form(default=False)
+    enable_uv_texture_upscale: List[int] = Form(default=[0, 0], min_length=2, max_length=2)
     enable_semantics: bool = Form(default=False)
     displacement_strength: float = Form(default=0.03)
 
@@ -61,12 +61,15 @@ class RunConfig:
     total_remesh_mode: str = Form(default="none")
     stages_enable: List[int] = Form(default=[1, 0], min_length=2, max_length=2)
 
+    texture_final_resolution: List[int] = Form(default=[2560, 8192, 2560, 8192], min_length=4, max_length=4)
+
 
 @router.post("/schedule_job")
 def schedule_job(
         config: RunConfig = Depends(),
 ):
     job_id = str(uuid.uuid4())
+    config.enable_semantics = False
 
     input_meshes = [(f'{i:0>3}_{file.filename}', file) for i, file in enumerate(config.input_meshes)]
     style_images = [(f'{i:0>3}_{file.filename}', file) for i, file in enumerate(config.style_images)]
@@ -98,7 +101,7 @@ def schedule_job(
             *['gpu.stage_4' if config.enable_semantics else None],
 
             *['cpu.stage_7' if not config.disable_displacement else None],
-            *['gpu.stage_8' if config.enable_4x_upscale and not config.disable_3d else None],
+            *['gpu.stage_8' if config.enable_uv_texture_upscale and not config.disable_3d else None],
             *['cpu.stage_9' if not config.disable_3d else None],
 
             # 'gpu.poststage_0',
@@ -117,7 +120,7 @@ def schedule_job(
             prompt_strength=config.prompt_strength,
             random_seed=config.random_seed,
             disable_displacement=config.disable_displacement,
-            texture_resolution=config.texture_resolution,
+            texture_processing_resolution=config.texture_processing_resolution,
             input_meshes=[filename for filename, _ in input_meshes],
             style_images_paths=[filename for filename, _ in style_images],
             style_images_weights=config.style_images_weights,
@@ -137,7 +140,7 @@ def schedule_job(
             stages_upscale=config.stages_upscale,
 
             displacement_rgb_derivation_weight=config.displacement_rgb_derivation_weight,
-            enable_4x_upscale=config.enable_4x_upscale,
+            enable_uv_texture_upscale=config.enable_uv_texture_upscale,
             enable_semantics=config.enable_semantics,
             displacement_strength=config.displacement_strength,
 
@@ -147,6 +150,8 @@ def schedule_job(
 
             total_remesh_mode=config.total_remesh_mode,
             stages_enable=config.stages_enable,
+
+            texture_final_resolution=config.texture_final_resolution,
         ).model_dump()),
     )
 

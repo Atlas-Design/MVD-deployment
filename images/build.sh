@@ -17,7 +17,7 @@ function build() {
   echo "----------------------------------------------------------------------------------"
   docker buildx bake -f blender.docker-bake.hcl --progress plain --push --builder=container
   echo "----------------------------------------------------------------------------------"
-#  docker buildx bake -f comfywr.docker-bake.hcl --progress plain --push --builder=container
+  docker buildx bake -f comfywr.docker-bake.hcl --progress plain --push --builder=container
   echo "----------------------------------------------------------------------------------"
 }
 

@@ -5,10 +5,12 @@ import json
 import shutil
 import zipfile
 
+import celery
 import requests
 import docker
 import docker.types
 import docker.models.containers
+from celery import Task
 
 from pydantic import BaseModel
 from google.cloud import storage
@@ -63,18 +65,25 @@ def load_data(tmp_dir: str, job_id: str) -> None:
         zf.extractall(os.path.join(tmp_dir))
 
 
+class LogException(Exception):
+    def __init__(self, kind: str, logs: str):
+        self.kind = kind
+        self.logs = logs
+        Exception.__init__(self, kind, logs)
+
+
 def wait_docker_exit(container: docker.models.containers.Container) -> str:
     # Note: For some reason, docker container sometimes stuck exiting
     #   in those cases log streaming exits correctly, so use `logs()` instead of `wait()`
     try:
         logs = ''
-        for log in container.logs(timestamps=True, stream=True):
+        for log in container.logs(timestamps=False, stream=True):
             logs += log.decode()
 
         if 'Traceback' in logs:
-            raise Exception(f"Error in logs: {logs}")
+            raise LogException(kind='exception', logs=logs)
         elif 'ExitCodeError' in logs:
-            raise Exception(f"Non-zero exit code: {logs}")
+            raise LogException(kind='exit-code', logs=logs)
 
         return logs
     except requests.exceptions.ReadTimeout:
@@ -91,7 +100,7 @@ def run_docker_command(image: str, context: dict, command: str, with_gpu: bool) 
     return client.containers.run(
         image=image,
         command=[
-            'bash', '-ex', '-c',
+            'bash', '-e', '-c',
             "trap 'echo \\Exit\\Code\\Error' ERR INT" + "; " + command.format(**context)
         ],
         volumes=[

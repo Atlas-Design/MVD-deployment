@@ -32,3 +32,5 @@ class Job(BaseModel):
     steps = TextField()
     payload = TextField()
 
+    logs = TextField(default=None, null=True)
+

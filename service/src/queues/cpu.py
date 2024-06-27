@@ -32,7 +32,7 @@ class PreStage0Input(AnyStageInput):
     prompt_strength: float
     random_seed: int
     disable_displacement: bool
-    texture_resolution: int
+    texture_processing_resolution: List[int]
     input_meshes: List[str]
     style_images_paths: List[str]
     style_images_weights: List[float]
@@ -52,7 +52,7 @@ class PreStage0Input(AnyStageInput):
 
     stages_upscale: List[float]
     displacement_rgb_derivation_weight: float
-    enable_4x_upscale: bool
+    enable_uv_texture_upscale: List[int]
     enable_semantics: bool
     displacement_strength: float
 
@@ -62,6 +62,8 @@ class PreStage0Input(AnyStageInput):
 
     total_remesh_mode: str
     stages_enable: List[int]
+
+    texture_final_resolution: List[int]
 
 
 @queue.task(typing=True)
@@ -101,7 +103,7 @@ def prestage_0(raw_input: dict) -> dict:
 
         *['--disable_displacement' if input.disable_displacement else ''],
 
-        '--texture_resolution', str(input.texture_resolution),
+        *multivalue_option('--texture_processing_resolution', [str(value) for value in input.texture_processing_resolution]),
 
         *multivalue_option('--input_meshes', [os.path.join(context["docker_input_dir"], path) for path in input.input_meshes]),
 
@@ -131,14 +133,15 @@ def prestage_0(raw_input: dict) -> dict:
         '--displacement_strength', str(input.displacement_strength),
         '--displacement_rgb_derivation_weight', str(input.displacement_rgb_derivation_weight),
 
-        *['--enable_4x_upscale' if input.enable_4x_upscale else ''],
-        *['--enable_semantics' if input.enable_semantics else ''],
+        *multivalue_option('--enable_uv_texture_upscale', [str(value) for value in input.enable_uv_texture_upscale]),
+        # *['--enable_semantics' if input.enable_semantics else ''],
 
         '--n_cameras', str(input.n_cameras),
         *multivalue_option('--camera_pitches', [str(value) for value in input.camera_pitches]),
         *multivalue_option('--camera_yaws', [str(value) for value in input.camera_yaws]),
 
         '--total_remesh_mode', input.total_remesh_mode,
+        *multivalue_option('--texture_final_resolution', [str(value) for value in input.texture_final_resolution]),
     ]
 
     load_data(tmp_dir, input.job_id)

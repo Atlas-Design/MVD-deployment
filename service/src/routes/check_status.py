@@ -30,6 +30,7 @@ def check_status(
     return JSONResponse(
         content={
             "status": job.status,
-            "progress": [job.progress, job.total]
+            "progress": [job.progress, job.total],
+            "logs": job.logs,
         }
     )

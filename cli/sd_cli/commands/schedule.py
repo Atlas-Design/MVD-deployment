@@ -69,19 +69,19 @@ def add_subparser(subparsers):
                         help="Classifier-free guidance scale. It's basically the text prompting weight.")
     parser.add_argument('--random_seed', type=int, default=42,
                         help="Global random seed for the whole pipeline")
-    parser.add_argument('--texture_resolution', type=int, default=2560,
-                        help="Baked UV RGB and displacement textures resolution for the final mesh."
-                             "Lower value is slightly lower processing time. "
+    parser.add_argument('--texture_processing_resolution', type=int, nargs=2, default=(2560, 2560),
+                        help="Baked UV RGB and displacement textures resolutions (2 integers) for the final mesh."
+                             "Lower values is slightly lower processing time. "
                              "Only relevant if disable_3d flag is not set."
-                             "When running with disable_upscaling flag, "
+                             "When running with lower upscaling (e.g. disabled upscaling flags), "
                              "it is safe to keep at lower value without much detail loss -- e.g. 1280."
-                             "High values especially slows down pipeline when enable_semantics flag is set")
+                             "High values especially slows down pipeline especially when enable_semantics flag is set")
     parser.add_argument('--stages_upscale', type=float, nargs=2, default=(1.9, 2),
                         help="Multiplier for the generated image size (for stages 2 and 3). "
                              "Relevant only when relevant stages_enable flag are set. "
                              "The higher the values the slower the processing time. "
-                             "Keep in mind the texture_resolution value -- "
-                             "too small texture_resolution parameter value will not utilize "
+                             "Keep in mind the texture_processing_resolution value -- "
+                             "too small texture_processing_resolution parameter value will not utilize "
                              "high upscaling factors values properly. "
                              "Therefore, high-res information can be lost "
                              "when projecting RGB data to UV space in such case. ")
@@ -125,7 +125,8 @@ def add_subparser(subparsers):
                              "If a single value is provided, it is repeated --n_cameras times.")
 
     parser.add_argument('--total_remesh_mode', type=str, default='none',
-                        help='One of "none", "smooth_organic", "none_organic", "hard_surface", "smoothed_hard_surface".'
+                        help='One of "none", "smooth_generic", "sharp_generic", "smooth_organic", '
+                             '"none_organic", "hard_surface", "smoothed_hard_surface".'
                              'It runs complex input mesh preprocessing if !="none".'
                              'See CLI examples for understanding how options work'
                              ' -- functionality hard to describe in text.')
@@ -143,13 +144,21 @@ def add_subparser(subparsers):
     parser.add_argument('--disable_displacement', action='store_true', default=False,
                         help="Don't generate displacement maps. Faster processing time."
                              "In case of running disable_3d, it skips generating depth maps.")
-    parser.add_argument('--enable_4x_upscale', action='store_true', default=False,
-                        help="Upscale RGB and displacement (if applies) UV textures 4x. "
+    parser.add_argument('--enable_uv_texture_upscale', type=int, nargs=2, default=(0, 0),
+                        help="Upscale RGB and/or displacement (if applies) UV textures 4x. "
                              "Relevant only when disable_3d flag is not set. "
                              "Significantly slows down pipeline.")
-    parser.add_argument('--enable_semantics', action='store_true', default=False,
-                        help="Enable semantic segmentation output for buildings."
-                             "Significantly slows down pipeline.")
+    parser.add_argument('--texture_final_resolution', type=int, nargs=4, default=(2560, 8192, 2560, 8192),
+                        help="4 integers (lower rgb resolution, upper rgb resolution, remaining 2 for displacement)."
+                             "Only relevant if equivalent (for rgb or displacement) enable_uv_texture_upscale flag is set. "
+                             "Final UV texture resolution will be the upper value."
+                             "UV textures in the final texture processing stage are: \n"
+                             "a) rescaled from processing resolution to the lower resolution\n "
+                             "b) upscaled 4x\n "
+                             "c) rescaled to the upper resolution")
+    # parser.add_argument('--enable_semantics', action='store_true', default=False,
+    #                     help="Enable semantic segmentation output for buildings."
+    #                          "Significantly slows down pipeline.")
 
     parser.add_argument('-i', '--input_meshes', type=file_type, nargs="+", required=True,
                         help='A path to the input massing .obj file.')
@@ -204,14 +213,15 @@ def schedule(
     for lora in kwargs['loras']:
         if lora not in SUPPORTED_LORAS:
             raise UsageError(f'LoRA {lora} not in supported LoRA list: {list(SUPPORTED_LORAS)}')
-    if kwargs['enable_4x_upscale'] and kwargs['disable_3d']:
-        raise UsageError('Both enable_4x_upscale and disable_3d flags cannot be used together.')
+    if kwargs['enable_uv_texture_upscale'] and kwargs['disable_3d']:
+        raise UsageError('Both enable_uv_texture_upscale and disable_3d flags cannot be used together.')
     if len(kwargs['camera_yaws']) not in (1, kwargs['n_cameras']):
         raise UsageError('Camera yaws amount needs to be either 1 or --n_cameras')
     if len(kwargs['camera_pitches']) not in (1, kwargs['n_cameras']):
         raise UsageError('Camera pitches amount needs to be either 1 or --n_cameras')
 
-    total_remesh_mode_options = {'none', 'smooth_organic', 'none_organic', 'hard_surface', 'smoothed_hard_surface'}
+    total_remesh_mode_options = {'none', 'smooth_generic', 'sharp_generic', 'smooth_organic', 'none_organic',
+                                 'hard_surface', 'smoothed_hard_surface'}
     if kwargs['total_remesh_mode'] not in total_remesh_mode_options:
         raise UsageError(f'{kwargs["total_remesh_mode"]=} not in {total_remesh_mode_options}')
 
@@ -244,10 +254,15 @@ def schedule(
 
             status = check_result["status"]
             progress = check_result["progress"]
+            logs = check_result["logs"]
 
             print(f"Job ID: {job_id}\nStatus: {status}\nProgress: {progress[0]}/{progress[1]}\n")
 
             if status == "FAILED":
+                if logs is not None:
+                    print(f"Logs from failed stage: ")
+                    print(logs)
+
                 raise UsageError("Job failed")
             elif status == "SUCCEEDED":
                 break

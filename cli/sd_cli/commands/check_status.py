@@ -49,10 +49,15 @@ def check_status(
 
         status = check_result["status"]
         progress = check_result["progress"]
+        logs = check_result["logs"]
 
         print(f"Job ID: {job_id}\nStatus: {status}\nProgress: {progress[0]}/{progress[1]}\n")
 
         if status == "FAILED":
+            if logs is not None:
+                print("Logs from failed stage:")
+                print(logs)
+
             raise UsageError("Job failed")
         elif status == "SUCCEEDED":
             break

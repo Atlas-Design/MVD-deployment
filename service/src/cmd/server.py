@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from database import db, Job
+from database import run_migrations
 from settings import settings, Environment
 
 from routes.schedule_job import router as schedule_job_router
@@ -18,7 +19,8 @@ from routes.check_status import router as check_status_router
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     db.connect()
-    db.create_tables([Job])
+    run_migrations()
+
     yield
     db.close()
 

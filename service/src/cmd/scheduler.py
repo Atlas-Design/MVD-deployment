@@ -64,6 +64,10 @@ def check_status_of_running_jobs():
                 job.status = JobStatus.RUNNING
             elif job_state == "FAILURE":
                 job.status = JobStatus.FAILED
+
+                if isinstance(job_result.info, queues.base.LogException):
+                    job.logs = job_result.info.logs
+
                 logger.error(job_result.traceback)
             elif job_state == "SUCCESS":
                 job_result.forget()
