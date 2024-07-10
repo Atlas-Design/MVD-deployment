@@ -7,6 +7,7 @@ COPY --from=comfywr-root ComfyUI /workdir/ComfyUI
 COPY --from=comfywr-root custom_nodes /workdir/custom_nodes
 COPY --from=comfywr-root comfywr /workdir/comfywr
 COPY --from=comfywr-root custom_nodes/ComfyUI_UltimateSDUpscale /workdir/ComfyUI/custom_nodes/ComfyUI_UltimateSDUpscale
+COPY --from=comfywr-root custom_nodes/ComfyUI-DepthAnythingV2 /workdir/ComfyUI/custom_nodes/ComfyUI-DepthAnythingV2
 
 ADD https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model.pth?download=true /workdir/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/sk_model.pth
 ADD https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model2.pth?download=true /workdir/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/sk_model2.pth

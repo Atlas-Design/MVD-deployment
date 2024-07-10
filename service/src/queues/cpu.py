@@ -48,6 +48,7 @@ class PreStage0Input(AnyStageInput):
     direct_config_override: List[str]
 
     stages_denoise: List[float]
+    depth_algorithm: str
     displacement_quality: int
 
     stages_upscale: List[float]
@@ -126,6 +127,7 @@ def prestage_0(raw_input: dict) -> dict:
 
         *multivalue_option('--stages_denoise', [str(value) for value in input.stages_denoise]),
 
+        '--depth_algorithm', str(input.depth_algorithm),
         '--displacement_quality', str(input.displacement_quality),
 
         *multivalue_option('--stages_upscale', [str(value) for value in input.stages_upscale]),

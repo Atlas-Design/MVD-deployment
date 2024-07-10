@@ -95,8 +95,12 @@ def add_subparser(subparsers):
                              "Setting too high may cause too much "
                              " repeatable and distorted geometry to be generated. "
                              "Only relevant when relevant stages_enable flags are set.")
+    parser.add_argument('--depth_algorithm', type=str, default='Marigold',
+                        help='Depth estimation is a necessary stage for displacement generation. '
+                             'Supported values are "Marigold" or "DepthAnythingV2". ')
     parser.add_argument('--displacement_quality', type=int, default=2,
-                        help="Higher values will produce a little bit less noisy displacement,"
+                        help="Only relevant if depth_algorithm argument value is Marigold."
+                             "Higher values will produce a little bit less noisy displacement,"
                              "but slow down the pipeline significantly."
                              "Only relevant when disable_displacement flag is not set."
                              "Setting beyond ~12 is not recommended as the results will likely be no better afterwards "
@@ -161,7 +165,7 @@ def add_subparser(subparsers):
     #                          "Significantly slows down pipeline.")
 
     parser.add_argument('-i', '--input_meshes', type=file_type, nargs="+", required=True,
-                        help='A path to the input massing .obj file.')
+                        help='List of paths to input massing .obj, .fbx or .glb files.')
     parser.add_argument('-s', '--style_images_paths', type=file_type, nargs="*", default=[],
                         help='Paths to input style images that will influence the result')
     parser.add_argument('-sw', '--style_images_weights', type=float, nargs="*", default=[],
@@ -224,6 +228,9 @@ def schedule(
                                  'hard_surface', 'smoothed_hard_surface'}
     if kwargs['total_remesh_mode'] not in total_remesh_mode_options:
         raise UsageError(f'{kwargs["total_remesh_mode"]=} not in {total_remesh_mode_options}')
+    depth_options = {'Marigold', 'DepthAnythingV2'}
+    if kwargs['depth_algorithm'] not in depth_options:
+        raise ValueError(f'{kwargs["depth_algorithm"]=} not in {depth_options}')
 
     if output is not None:
         follow = True

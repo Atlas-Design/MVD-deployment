@@ -46,6 +46,7 @@ class RunConfig:
     direct_config_override: List[str] = Form(default=[])
 
     stages_denoise: List[float] = Form(default=[0.45, 0.2])
+    depth_algorithm: str = Form(default="Marigold")
     displacement_quality: int = Form(default=2)
 
     stages_upscale: List[float] = Form(default=[1.9, 2], min_length=2, max_length=2)
@@ -135,6 +136,7 @@ def schedule_job(
             direct_config_override=config.direct_config_override,
 
             stages_denoise=config.stages_denoise,
+            depth_algorithm=config.depth_algorithm,
             displacement_quality=config.displacement_quality,
 
             stages_upscale=config.stages_upscale,
