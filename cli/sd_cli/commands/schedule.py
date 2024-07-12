@@ -217,7 +217,7 @@ def schedule(
     for lora in kwargs['loras']:
         if lora not in SUPPORTED_LORAS:
             raise UsageError(f'LoRA {lora} not in supported LoRA list: {list(SUPPORTED_LORAS)}')
-    if kwargs['enable_uv_texture_upscale'] and kwargs['disable_3d']:
+    if any(kwargs['enable_uv_texture_upscale']) and kwargs['disable_3d']:
         raise UsageError('Both enable_uv_texture_upscale and disable_3d flags cannot be used together.')
     if len(kwargs['camera_yaws']) not in (1, kwargs['n_cameras']):
         raise UsageError('Camera yaws amount needs to be either 1 or --n_cameras')
