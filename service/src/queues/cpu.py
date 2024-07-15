@@ -1,16 +1,15 @@
-import time
 from typing import List
-from dataclasses import dataclass
 
 import os
 import shutil
-from itertools import chain
 
-from celery import Celery
+import docker
+from celery import Celery, Task
+from celery.signals import task_revoked
 
 from settings import settings
 from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, load_data, save_data, wait_docker_exit, \
-    run_blender_docker_command, generate_blender_command
+    run_blender_docker_command, generate_blender_command, generate_container_name
 
 from celery.utils.log import get_task_logger
 logger = get_task_logger(__name__)
@@ -24,6 +23,15 @@ queue.conf.task_default_queue = 'cpu'
 queue.conf.broker_connection_retry = True
 queue.conf.broker_connection_retry_on_startup = False
 queue.conf.task_track_started = True
+
+
+@task_revoked.connect()
+def on_revoke(**kwargs):
+    logger.info(f"Got revoke: {kwargs}")
+
+    container_name = f"{kwargs['sender'].__name__}-{kwargs['request'].id}"
+    client = docker.from_env()
+    client.api.kill(container_name)
 
 
 class PreStage0Input(AnyStageInput):
@@ -67,11 +75,11 @@ class PreStage0Input(AnyStageInput):
     texture_final_resolution: List[int]
 
 
-@queue.task(typing=True)
-def prestage_0(raw_input: dict) -> dict:
+@queue.task(bind=True, typing=True)
+def prestage_0(self: Task, raw_input: dict) -> dict:
     logger.info("Running prestage_0")
 
-    input = PreStage0Input.parse_obj(raw_input)
+    input = PreStage0Input.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
 
@@ -97,8 +105,8 @@ def prestage_0(raw_input: dict) -> dict:
     generate_config_args = [
         '--workdir', "{docker_output_dir}",
 
-        '--pos_prompt', f"'{pos_prompt}'",
-        '--neg_prompt', f"'{neg_prompt}'",
+        '--pos_prompt', f'"{pos_prompt}"',
+        '--neg_prompt', f'"{neg_prompt}"',
         '--prompt_strength', str(input.prompt_strength),
         '--random_seed', str(input.random_seed),
 
@@ -150,6 +158,7 @@ def prestage_0(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             ' '.join([
                 "${{BLENDERPY}}", "/workdir/tools/config_generator.py",
@@ -190,16 +199,16 @@ def prestage_0(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
-@queue.task(typing=True)
-def stage_0(raw_input: dict) -> dict:
+@queue.task(bind=True, typing=True)
+def stage_0(self: Task, raw_input: dict) -> dict:
     logger.info("Running stage_0")
 
-    input = AnyStageInput.parse_obj(raw_input)
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -207,6 +216,7 @@ def stage_0(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'preprocess_input.py',
@@ -218,14 +228,14 @@ def stage_0(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
-@queue.task(typing=True)
-def stage_1(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def stage_1(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -234,6 +244,7 @@ def stage_1(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'render_priors.py',
@@ -245,14 +256,14 @@ def stage_1(raw_input: dict) -> dict:
 
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
 
     return {}
 
 
-@queue.task(typing=True)
-def stage_3(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def stage_3(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -260,6 +271,7 @@ def stage_3(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'make_projected_rgb.py',
@@ -277,9 +289,9 @@ def stage_3(raw_input: dict) -> dict:
     return {}
 
 
-# @queue.task(typing=True)
+# @queueself: Task, .bind=True, ask(typing=True)
 # def stage_5(raw_input: dict) -> dict:
-#     input = AnyStageInput.parse_obj(raw_input)
+#     input = AnyStageInput.model_validate(raw_input)
 #
 #     tmp_dir = get_tmp_dir(input.job_id)
 #     load_data(tmp_dir, input.job_id)
@@ -288,6 +300,7 @@ def stage_3(raw_input: dict) -> dict:
 #
 #     logs = wait_docker_exit(
 #         run_blender_docker_command(
+#             generate_container_name(self.__name__, self.request.id),
 #             context,
 #             generate_blender_command(
 #                 'refine_input_semantics.py',
@@ -305,9 +318,9 @@ def stage_3(raw_input: dict) -> dict:
 #     return {}
 
 
-@queue.task(typing=True)
-def stage_6(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def stage_6(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -315,6 +328,7 @@ def stage_6(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'make_total_recursive_grid.py',
@@ -332,9 +346,9 @@ def stage_6(raw_input: dict) -> dict:
     return {}
 
 
-@queue.task(typing=True)
-def stage_7(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def stage_7(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -342,6 +356,7 @@ def stage_7(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'make_displacement_map.py',
@@ -359,9 +374,9 @@ def stage_7(raw_input: dict) -> dict:
     return {}
 
 
-@queue.task(typing=True)
-def stage_9(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def stage_9(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -369,6 +384,7 @@ def stage_9(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'make_final_blend.py',
@@ -383,5 +399,15 @@ def stage_9(raw_input: dict) -> dict:
     save_context(tmp_dir, context)
     save_data(tmp_dir, input.job_id)
     # shutil.rmtree(tmp_dir)
+
+    return {}
+
+
+@queue.task(bind=True, typing=True)
+def cleanup(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
+
+    tmp_dir = get_tmp_dir(input.job_id)
+    shutil.rmtree(tmp_dir)
 
     return {}

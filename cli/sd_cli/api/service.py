@@ -82,3 +82,18 @@ class ServiceCheckStatusCommand(BaseCommand):
             method="GET",
             params={"job_id": job_id},
         )
+
+
+class ServiceCancelJobCommand(BaseCommand):
+    def __init__(
+            self,
+            base_url: str,
+
+            job_id: str,
+    ):
+        super().__init__(
+            base_url=base_url,
+            path="/cancel_job",
+            method="GET",
+            params={"job_id": job_id},
+        )

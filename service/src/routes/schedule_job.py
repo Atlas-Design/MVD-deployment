@@ -106,6 +106,8 @@ def schedule_job(
             *['cpu.stage_9' if not config.disable_3d else None],
 
             # 'gpu.poststage_0',
+
+            'cpu.cleanup',
         ]
     ))
 
@@ -119,7 +121,7 @@ def schedule_job(
             pos_prompt=config.pos_prompt,
             neg_prompt=config.neg_prompt,
             prompt_strength=config.prompt_strength,
-            random_seed=config.random_seed,
+            random_seed=int(config.random_seed),
             disable_displacement=config.disable_displacement,
             texture_processing_resolution=config.texture_processing_resolution,
             input_meshes=[filename for filename, _ in input_meshes],

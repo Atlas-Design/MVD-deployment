@@ -52,8 +52,8 @@ def download(
     check_result = check_command.run()
 
     status = check_result["status"]
-    if status == "FAILED":
-        raise UsageError("Cannot download output of failed job")
+    if status in {"FAILED", "CANCELLED"}:
+        raise UsageError("Cannot download output of failed or cancelled job")
     elif status != "SUCCEEDED":
         raise UsageError("Job is still pending, wait until job is completed")
 

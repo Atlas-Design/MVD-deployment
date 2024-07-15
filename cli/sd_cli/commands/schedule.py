@@ -210,6 +210,8 @@ def schedule(
 
         **kwargs,
 ):
+    print(kwargs['pos_prompt'])
+
     if len(kwargs['style_images_weights']) not in (len(style_images_paths), len(style_images_paths) * 3):
         raise UsageError('style images and style images weights arguments should be in the same amount or 3x.')
     if len(kwargs['loras']) != len(kwargs['loras_weights']):
@@ -265,7 +267,7 @@ def schedule(
 
             print(f"Job ID: {job_id}\nStatus: {status}\nProgress: {progress[0]}/{progress[1]}\n")
 
-            if status == "FAILED":
+            if status in {"FAILED", "CANCELLED"}:
                 if logs is not None:
                     print(f"Logs from failed stage: ")
                     print(logs)

@@ -91,13 +91,18 @@ def wait_docker_exit(container: docker.models.containers.Container) -> str:
         raise
 
 
-def run_docker_command(image: str, context: dict, command: str, with_gpu: bool) -> docker.models.containers.Container:
+def generate_container_name(task_name: str, task_id: str) -> str:
+    return f"{task_name}-{task_id}"
+
+
+def run_docker_command(container_name: str, image: str, context: dict, command: str, with_gpu: bool) -> docker.models.containers.Container:
     client = docker.from_env()
 
     # Note: Since we can't use `wait()` to get exit code, we need to use a workaround to detect non-zero exit code
     #   This is done by using `trap` in the command. Also, because we use -x flag,
     #   we need to use `\\` to concatenate the `ExitCodeError` string without interpreting it as an error
     return client.containers.run(
+        name=container_name,
         image=image,
         command=[
             'bash', '-e', '-c',
@@ -130,16 +135,18 @@ def run_docker_command(image: str, context: dict, command: str, with_gpu: bool) 
     )
 
 
-def run_comfywr_docker_command(context: dict, command: str, with_gpu: bool = False) -> docker.models.containers.Container:
+def run_comfywr_docker_command(container_name: str, context: dict, command: str, with_gpu: bool = False) -> docker.models.containers.Container:
     return run_docker_command(
+        container_name,
         f"europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_comfywr:{settings.QUEUE_IMAGE_TAG.value}",
         context, command,
         with_gpu,
     )
 
 
-def run_blender_docker_command(context: dict, command: str, with_gpu: bool = False) -> docker.models.containers.Container:
+def run_blender_docker_command(container_name: str, context: dict, command: str, with_gpu: bool = False) -> docker.models.containers.Container:
     return run_docker_command(
+        container_name,
         f"europe-central2-docker.pkg.dev/unitydiffusion/sd-experiments/sd_blender:{settings.QUEUE_IMAGE_TAG.value}",
         context, command,
         with_gpu,

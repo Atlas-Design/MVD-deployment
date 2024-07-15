@@ -53,7 +53,7 @@ def check_status(
 
         print(f"Job ID: {job_id}\nStatus: {status}\nProgress: {progress[0]}/{progress[1]}\n")
 
-        if status == "FAILED":
+        if status in {"FAILED", "CANCELLED"}:
             if logs is not None:
                 print("Logs from failed stage:")
                 print(logs)

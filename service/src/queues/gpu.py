@@ -1,9 +1,11 @@
-from celery import Celery
+import docker
+from celery import Celery, Task
+from celery.signals import task_revoked
 from celery.utils.log import get_task_logger
 
 from settings import settings
 from queues.base import AnyStageInput, get_tmp_dir, save_context, load_context, save_data, load_data, wait_docker_exit, \
-    run_comfywr_docker_command, run_blender_docker_command, generate_blender_command
+    run_comfywr_docker_command, run_blender_docker_command, generate_blender_command, generate_container_name
 
 logger = get_task_logger(__name__)
 
@@ -18,9 +20,18 @@ queue.conf.broker_connection_retry_on_startup = False
 queue.conf.task_track_started = True
 
 
-@queue.task(typing=True)
-def stage_2(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@task_revoked.connect()
+def on_revoke(**kwargs):
+    logger.info(f"Got revoke: {kwargs}")
+
+    container_name = f"{kwargs['sender'].__name__}-{kwargs['request'].id}"
+    client = docker.from_env()
+    client.api.kill(container_name)
+
+
+@queue.task(bind=True, typing=True)
+def stage_2(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -28,6 +39,7 @@ def stage_2(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_comfywr_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             'python3 /workdir/sd_scripts/generate_textures.py '
             '/workdir/{prior_renders_path} '
@@ -46,9 +58,9 @@ def stage_2(raw_input: dict) -> dict:
     return {}
 
 
-@queue.task(typing=True)
-def stage_4(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def stage_4(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -56,6 +68,7 @@ def stage_4(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'generate_semantics.py',
@@ -75,9 +88,9 @@ def stage_4(raw_input: dict) -> dict:
     return {}
 
 
-@queue.task(typing=True)
-def stage_8(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def stage_8(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -85,6 +98,7 @@ def stage_8(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_comfywr_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             'python3 /workdir/sd_scripts/final_upscale.py '
             '/workdir/{projection_output} '
@@ -104,9 +118,9 @@ def stage_8(raw_input: dict) -> dict:
     return {}
 
 
-@queue.task(typing=True)
-def poststage_0(raw_input: dict) -> dict:
-    input = AnyStageInput.parse_obj(raw_input)
+@queue.task(bind=True, typing=True)
+def poststage_0(self: Task, raw_input: dict) -> dict:
+    input = AnyStageInput.model_validate(raw_input)
 
     tmp_dir = get_tmp_dir(input.job_id)
     load_data(tmp_dir, input.job_id)
@@ -114,6 +128,7 @@ def poststage_0(raw_input: dict) -> dict:
 
     logs = wait_docker_exit(
         run_blender_docker_command(
+            generate_container_name(self.__name__, self.request.id),
             context,
             generate_blender_command(
                 'make_final_renders.py',
