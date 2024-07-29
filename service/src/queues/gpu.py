@@ -41,7 +41,7 @@ def stage_2(self: Task, raw_input: dict) -> dict:
         run_comfywr_docker_command(
             generate_container_name(self.__name__, self.request.id),
             context,
-            'python3 /workdir/sd_scripts/generate_textures.py '
+            'python /workdir/sd_scripts/generate_textures.py '
             '/workdir/{prior_renders_path} '
             '/workdir/{generated_textures_path} '
             '--config /workdir/{config_path} ',
@@ -100,7 +100,7 @@ def stage_8(self: Task, raw_input: dict) -> dict:
         run_comfywr_docker_command(
             generate_container_name(self.__name__, self.request.id),
             context,
-            'python3 /workdir/sd_scripts/final_upscale.py '
+            'python /workdir/sd_scripts/final_upscale.py '
             '/workdir/{projection_output} '
             '/workdir/{displacement_output} '
             '/workdir/{upscaled_textures_path} '

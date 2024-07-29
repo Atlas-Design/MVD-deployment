@@ -105,7 +105,7 @@ def run_docker_command(container_name: str, image: str, context: dict, command: 
         name=container_name,
         image=image,
         command=[
-            'bash', '-e', '-c',
+            'bash', '-e', '-c', '-x',
             "trap 'echo \\Exit\\Code\\Error' ERR INT" + "; " + command.format(**context)
         ],
         volumes=[

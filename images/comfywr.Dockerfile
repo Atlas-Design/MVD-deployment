@@ -12,7 +12,12 @@ COPY --from=comfywr-root custom_nodes/ComfyUI-DepthAnythingV2 /workdir/ComfyUI/c
 ADD https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model.pth?download=true /workdir/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/sk_model.pth
 ADD https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model2.pth?download=true /workdir/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/sk_model2.pth
 
-RUN apt install git git-lfs -y
+RUN apt-get update && \
+  apt install git git-lfs -y && \
+  rm -rf /var/lib/apt/lists/*
+
 
 RUN git -c 'lfs.fetchexclude=*.bin,*fp16*' clone https://huggingface.co/prs-eth/marigold-v1-0 /workdir/ComfyUI/models/diffusers/Marigold
 #RUN git -c 'lfs.fetchexclude=*.bin,*fp16*' clone https://huggingface.co/prs-eth/marigold-lcm-v1-0 /workdir/ComfyUI/models/diffusers/marigold-lcm-v1-0
+
+RUN pip install torchaudio==2.3.0
