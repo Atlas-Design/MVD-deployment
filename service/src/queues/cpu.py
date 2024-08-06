@@ -347,34 +347,6 @@ def stage_6(self: Task, raw_input: dict) -> dict:
 
 
 @queue.task(bind=True, typing=True)
-def stage_7(self: Task, raw_input: dict) -> dict:
-    input = AnyStageInput.model_validate(raw_input)
-
-    tmp_dir = get_tmp_dir(input.job_id)
-    load_data(tmp_dir, input.job_id)
-    context = load_context(tmp_dir)
-
-    logs = wait_docker_exit(
-        run_blender_docker_command(
-            generate_container_name(self.__name__, self.request.id),
-            context,
-            generate_blender_command(
-                'make_displacement_map.py',
-                '/workdir/{preprocessed_massings_path} /workdir/{prior_renders_path} '
-                '/workdir/{generated_textures_path}/ /workdir/{displacement_output}',
-            )
-        )
-    )
-    logger.info(f"{logs=}")
-
-    save_context(tmp_dir, context)
-    save_data(tmp_dir, input.job_id)
-    # shutil.rmtree(tmp_dir)
-
-    return {}
-
-
-@queue.task(bind=True, typing=True)
 def stage_9(self: Task, raw_input: dict) -> dict:
     input = AnyStageInput.model_validate(raw_input)
 

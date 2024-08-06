@@ -99,13 +99,13 @@ def run_docker_command(container_name: str, image: str, context: dict, command: 
     client = docker.from_env()
 
     # Note: Since we can't use `wait()` to get exit code, we need to use a workaround to detect non-zero exit code
-    #   This is done by using `trap` in the command. Also, because we use -x flag,
+    #   This is done by using `trap` in the command. Also, in case -x flag is used,
     #   we need to use `\\` to concatenate the `ExitCodeError` string without interpreting it as an error
     return client.containers.run(
         name=container_name,
         image=image,
         command=[
-            'bash', '-e', '-c', '-x',
+            'bash', '-e', '-c',
             "trap 'echo \\Exit\\Code\\Error' ERR INT" + "; " + command.format(**context)
         ],
         volumes=[

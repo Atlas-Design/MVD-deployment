@@ -101,7 +101,7 @@ def schedule_job(
             *['cpu.stage_3' if not config.disable_3d else None],
             *['gpu.stage_4' if config.enable_semantics else None],
 
-            *['cpu.stage_7' if not config.disable_displacement else None],
+            *['gpu.stage_7' if not config.disable_displacement else None],
             *['gpu.stage_8' if config.enable_uv_texture_upscale and not config.disable_3d else None],
             *['cpu.stage_9' if not config.disable_3d else None],
 
