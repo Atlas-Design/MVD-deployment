@@ -5,7 +5,8 @@ setup(
     name='sd_cli',
     version=__version__,
     install_requires=[
-        'requests>=2.31.0'
+        'requests>=2.31.0',
+        'prettytable>=3.11.0'
     ],
     packages=find_packages(include=["*"]),
     include_package_data=True,

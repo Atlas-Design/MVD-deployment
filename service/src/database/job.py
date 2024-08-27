@@ -11,6 +11,7 @@ class JobStatus(str, enum.Enum):
     SCHEDULED = "SCHEDULED"
     RUNNING = "RUNNING"
 
+    CANCELLED = "CANCELLED"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
 

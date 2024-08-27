@@ -97,3 +97,16 @@ class ServiceCancelJobCommand(BaseCommand):
             method="GET",
             params={"job_id": job_id},
         )
+
+class ServiceListJobsCommand(BaseCommand):
+    def __init__(
+            self,
+            base_url: str,
+            all: bool = False,
+    ):
+        super().__init__(
+            base_url=base_url,
+            path="/list_jobs",
+            method="GET",
+            params={"all": all},
+        )

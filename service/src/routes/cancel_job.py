@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 import queues.cpu
 import queues.gpu
-from database import Job
+from database import Job, JobStatus
 
 client_storage = storage.Client()
 
@@ -29,7 +29,7 @@ def cancel_job(
         Job.id == job_id
     ).first()
 
-    job.status = "CANCELLED"
+    job.status = JobStatus.CANCELLED
     job.save()
 
     if job.current_step.startswith("gpu"):

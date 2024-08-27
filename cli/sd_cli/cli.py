@@ -1,4 +1,4 @@
-from .commands import root, download, check_status, schedule, cancel
+from .commands import root, download, check_status, schedule, cancel, list_jobs
 from .error import UsageError
 
 
@@ -9,6 +9,7 @@ def cli():
     check_status.add_subparser(command_subparsers)
     schedule.add_subparser(command_subparsers)
     cancel.add_subparser(command_subparsers)
+    list_jobs.add_subparser(command_subparsers)
 
     args = root_parser.parse_args()
 
